@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { useLanguage } from '../contexts/LanguageContext';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../supabase';
 import LangSwitcher from '../components/LangSwitcher';
@@ -8,7 +7,6 @@ import './AdminRestaurantEditor.css';
 
 export default function AdminRestaurantEditor() {
   const { userRole, signOut } = useAuth();
-  const { t } = useLanguage();
   const { restaurantId } = useParams();
   const navigate = useNavigate();
   const [restaurant, setRestaurant] = useState(null);
@@ -27,38 +25,22 @@ export default function AdminRestaurantEditor() {
 
   useEffect(() => {
     if (userRole !== 'admin') navigate('/dashboard');
-    fetchData();
+    const load = async () => {
+      try {
+        const { data: restData } = await supabase.from('restaurants').select('*').eq('id', restaurantId).single();
+        setRestaurant(restData);
+        const { data: catData } = await supabase.from('categories').select('*').eq('restaurant_id', restaurantId).order('name');
+        setCategories(catData || []);
+        const { data: menuData } = await supabase.from('menu_items').select('*').eq('restaurant_id', restaurantId).order('name');
+        setMenuItems(menuData || []);
+      } catch (error) {
+        console.error(error);
+      }
+    };
+    load();
   }, [userRole, restaurantId, navigate]);
 
-  const fetchData = async () => {
-    try {
-      // Get restaurant
-      const { data: restData } = await supabase
-        .from('restaurants')
-        .select('*')
-        .eq('id', restaurantId)
-        .single();
-      setRestaurant(restData);
 
-      // Get categories
-      const { data: catData } = await supabase
-        .from('categories')
-        .select('*')
-        .eq('restaurant_id', restaurantId)
-        .order('name');
-      setCategories(catData || []);
-
-      // Get menu items
-      const { data: menuData } = await supabase
-        .from('menu_items')
-        .select('*')
-        .eq('restaurant_id', restaurantId)
-        .order('name');
-      setMenuItems(menuData || []);
-    } catch (error) {
-      console.error(error);
-    }
-  };
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -99,7 +81,7 @@ export default function AdminRestaurantEditor() {
         await supabase.from('menu_items').insert([menuData]);
       }
 
-      await fetchData();
+      window.location.reload();
       setShowForm(false);
       setEditingItem(null);
       setFormData({ name: '', price: '', description: '', category_id: '', image: null });
