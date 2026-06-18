@@ -26,9 +26,7 @@ table {
   border-collapse: collapse;
 }
 
-thead {
-  background: #f8f9fa;
-}
+thead { background: #f8f9fa; }
 
 th {
   padding: 15px 20px;
@@ -49,20 +47,9 @@ td {
   font-weight: 600;
 }
 
-.status.pending {
-  background: #fff3cd;
-  color: #856404;
-}
-
-.status.approved {
-  background: #d4edda;
-  color: #155724;
-}
-
-.status.rejected {
-  background: #f8d7da;
-  color: #721c24;
-}
+.status.pending { background: #fff3cd; color: #856404; }
+.status.approved { background: #d4edda; color: #155724; }
+.status.rejected { background: #f8d7da; color: #721c24; }
 
 .review-btn {
   padding: 6px 12px;
@@ -72,10 +59,6 @@ td {
   border-radius: 6px;
   cursor: pointer;
   font-weight: 500;
-}
-
-.review-btn:hover {
-  background: #5568d8;
 }
 
 .modal {
@@ -121,8 +104,7 @@ td {
   padding: 10px;
   border: 2px solid #e0e0e0;
   border-radius: 8px;
-  font-family: Arial;
-  resize: vertical;
+  box-sizing: border-box;
 }
 
 .modal-actions {
@@ -140,20 +122,9 @@ td {
   font-weight: 500;
 }
 
-.cancel-btn {
-  background: #f0f0f0;
-  color: #333;
-}
-
-.reject-btn {
-  background: #ff4444;
-  color: white;
-}
-
-.approve-btn {
-  background: #28a745;
-  color: white;
-}
+.cancel-btn { background: #f0f0f0; color: #333; }
+.reject-btn { background: #ff4444; color: white; }
+.approve-btn { background: #28a745; color: white; }
 
 .empty {
   text-align: center;

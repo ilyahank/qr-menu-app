@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
+import { supabase } from '../supabase';
 import LangSwitcher from '../components/LangSwitcher';
 import './Login.css';
-import { supabase } from '../supabase';
-import { supabase } from '../supabase';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -28,32 +27,50 @@ export default function Login() {
     e.preventDefault();
     setError('');
     setLoading(true);
+
     try {
-      // Check if user is approved
-      const { data: userData } = await supabase.auth.signInWithPassword({
+      // Try to sign in
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
         email: email,
         password: password
       });
 
-      if (userData?.user) {
-        const { data: userRecord } = await supabase
-          .from('users')
-          .select('status')
-          .eq('id', userData.user.id)
-          .single();
+      if (authError) {
+        setError('Email not found or password incorrect');
+        setLoading(false);
+        return;
+      }
 
-        if (userRecord?.status === 'pending') {
+      if (authData?.user) {
+        // Check if email is confirmed
+        if (!authData.user.email_confirmed_at) {
+          setError('Please confirm your email first. Check your inbox.');
           await supabase.auth.signOut();
-          setError('Your account is pending approval. Please wait for admin confirmation.');
           setLoading(false);
           return;
         }
-      }
 
-      await signIn(email, password);
-      setLoggedIn(true);
+        // Check user status in database
+        const { data: userRecord } = await supabase
+          .from('users')
+          .select('status')
+          .eq('id', authData.user.id)
+          .single();
+
+        // If pending, show waiting page
+        if (userRecord?.status === 'pending') {
+          await supabase.auth.signOut();
+          navigate('/waiting-approval', { state: { email: email } });
+          setLoading(false);
+          return;
+        }
+
+        // If approved, continue
+        await signIn(email, password);
+        setLoggedIn(true);
+      }
     } catch (error) {
-      setError(t.invalidCredentials);
+      setError(error.message);
     }
     setLoading(false);
   };
@@ -78,8 +95,12 @@ export default function Login() {
             {loading ? t.loggingIn : t.loginBtn}
           </button>
         </form>
+
         <p className="signup-link">
-          New restaurant? <a href="/signup">Request access</a>
+          New restaurant? <Link to="/signup">Request access here</Link>
+        </p>
+        <p className="forgot-link">
+          <Link to="/forgot-password">Forgot password?</Link>
         </p>
       </div>
     </div>

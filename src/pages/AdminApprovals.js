@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { supabase } from '../supabase';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import LangSwitcher from '../components/LangSwitcher';
 import './AdminApprovals.css';
 
@@ -34,16 +34,19 @@ export default function AdminApprovals() {
   };
 
   const approveRequest = async (request) => {
+    if (!window.confirm(`Approve ${request.restaurant_name}?`)) return;
+
     try {
-      // 1. Create Supabase auth user
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: request.email,
-        password: request.password_hash,
-      });
+      // Get user
+      const { data: userData } = await supabase
+        .from('users')
+        .select('*')
+        .eq('email', request.email)
+        .single();
 
-      if (authError) throw authError;
+      if (!userData) throw new Error('User not found');
 
-      // 2. Create restaurant
+      // Create restaurant
       const { data: restaurant, error: restError } = await supabase
         .from('restaurants')
         .insert([{
@@ -56,25 +59,19 @@ export default function AdminApprovals() {
 
       if (restError) throw restError;
 
-      // 3. Create user record
-      if (authData?.user?.id) {
-        await supabase.from('users').insert([{
-          id: authData.user.id,
-          email: request.email,
-          restaurant_id: restaurant.id,
-          role: 'owner',
-          status: 'approved',
-          created_at: new Date()
-        }]);
-      }
+      // Update user
+      await supabase
+        .from('users')
+        .update({ status: 'approved', restaurant_id: restaurant.id })
+        .eq('id', userData.id);
 
-      // 4. Update subscription request
+      // Update request
       await supabase
         .from('subscription_requests')
         .update({ status: 'approved', approved_at: new Date(), admin_notes: adminNotes })
         .eq('id', request.id);
 
-      alert('✅ Request approved! User can now login.');
+      alert('✅ Approved!');
       setSelectedRequest(null);
       setAdminNotes('');
       fetchRequests();
@@ -84,6 +81,8 @@ export default function AdminApprovals() {
   };
 
   const rejectRequest = async (request) => {
+    if (!window.confirm(`Reject ${request.restaurant_name}?`)) return;
+
     try {
       await supabase
         .from('subscription_requests')
@@ -106,13 +105,14 @@ export default function AdminApprovals() {
       <nav className="admin-nav">
         <div className="nav-brand"><h2>Admin - Approvals</h2></div>
         <div className="nav-links">
+          <Link to="/admin" className="nav-link">Restaurants</Link>
           <LangSwitcher />
           <button onClick={signOut} className="logout-btn">Logout</button>
         </div>
       </nav>
 
       <div className="approvals-content">
-        <h1>Restaurant Signup Requests</h1>
+        <h1>Signup Requests</h1>
 
         <div className="requests-table">
           <table>
@@ -121,7 +121,7 @@ export default function AdminApprovals() {
                 <th>Restaurant</th>
                 <th>Email</th>
                 <th>Status</th>
-                <th>Requested</th>
+                <th>Date</th>
                 <th>Action</th>
               </tr>
             </thead>
@@ -130,11 +130,7 @@ export default function AdminApprovals() {
                 <tr key={request.id}>
                   <td>{request.restaurant_name}</td>
                   <td>{request.email}</td>
-                  <td>
-                    <span className={`status ${request.status}`}>
-                      {request.status}
-                    </span>
-                  </td>
+                  <td><span className={`status ${request.status}`}>{request.status}</span></td>
                   <td>{new Date(request.created_at).toLocaleDateString()}</td>
                   <td>
                     {request.status === 'pending' && (
@@ -169,21 +165,15 @@ export default function AdminApprovals() {
               </div>
 
               <div className="modal-actions">
-                <button onClick={() => setSelectedRequest(null)} className="cancel-btn">
-                  Cancel
-                </button>
-                <button onClick={() => rejectRequest(selectedRequest)} className="reject-btn">
-                  Reject
-                </button>
-                <button onClick={() => approveRequest(selectedRequest)} className="approve-btn">
-                  Approve
-                </button>
+                <button onClick={() => setSelectedRequest(null)} className="cancel-btn">Cancel</button>
+                <button onClick={() => rejectRequest(selectedRequest)} className="reject-btn">Reject</button>
+                <button onClick={() => approveRequest(selectedRequest)} className="approve-btn">Approve</button>
               </div>
             </div>
           </div>
         )}
 
-        {requests.length === 0 && <p className="empty">No requests yet.</p>}
+        {requests.length === 0 && <p className="empty">No requests.</p>}
       </div>
     </div>
   );
