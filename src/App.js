@@ -7,6 +7,9 @@ import AdminRoute from './components/AdminRoute';
 // Public Pages
 import PublicMenu from './pages/PublicMenu';
 import Login from './pages/Login';
+import Signup from './pages/Signup';
+import AdminApprovals from './pages/AdminApprovals';
+import PendingApproval from './pages/PendingApproval';
 
 // Owner Dashboard
 import Dashboard from './pages/Dashboard';

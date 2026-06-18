@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { supabase } from '../supabase';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import LangSwitcher from '../components/LangSwitcher';
 import './AdminPanel.css';
 
@@ -98,6 +98,7 @@ export default function AdminPanel() {
         <div className="nav-brand"><h2>{t.adminPanel}</h2></div>
         <div className="nav-links">
           <LangSwitcher />
+          <Link to="/admin/approvals" className="nav-link">Approvals</Link>
           <button onClick={signOut} className="logout-btn">{t.logout}</button>
         </div>
       </nav>

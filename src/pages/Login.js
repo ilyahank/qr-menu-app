@@ -4,6 +4,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { useNavigate } from 'react-router-dom';
 import LangSwitcher from '../components/LangSwitcher';
 import './Login.css';
+import { supabase } from '../supabase';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -27,6 +28,27 @@ export default function Login() {
     setError('');
     setLoading(true);
     try {
+      // Check if user is approved
+      const { data: userData } = await supabase.auth.signInWithPassword({
+        email: email,
+        password: password
+      });
+
+      if (userData?.user) {
+        const { data: userRecord } = await supabase
+          .from('users')
+          .select('status')
+          .eq('id', userData.user.id)
+          .single();
+
+        if (userRecord?.status === 'pending') {
+          await supabase.auth.signOut();
+          setError('Your account is pending approval. Please wait for admin confirmation.');
+          setLoading(false);
+          return;
+        }
+      }
+
       await signIn(email, password);
       setLoggedIn(true);
     } catch (error) {
@@ -55,6 +77,9 @@ export default function Login() {
             {loading ? t.loggingIn : t.loginBtn}
           </button>
         </form>
+        <p className="signup-link">
+          New restaurant? <a href="/signup">Request access</a>
+        </p>
       </div>
     </div>
   );
