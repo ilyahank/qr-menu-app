@@ -99,6 +99,7 @@ export default function AdminPanel() {
         <div className="nav-links">
           <LangSwitcher />
           <Link to="/admin/approvals" className="nav-link">Approvals</Link>
+          <Link to="/admin/approvals" className="nav-link">Approvals</Link>
           <button onClick={signOut} className="logout-btn">{t.logout}</button>
         </div>
       </nav>

@@ -10,6 +10,9 @@ import Login from './pages/Login';
 import Signup from './pages/Signup';
 import AdminApprovals from './pages/AdminApprovals';
 import PendingApproval from './pages/PendingApproval';
+import Signup from './pages/Signup';
+import AdminApprovals from './pages/AdminApprovals';
+import PendingApproval from './pages/PendingApproval';
 
 // Owner Dashboard
 import Dashboard from './pages/Dashboard';
