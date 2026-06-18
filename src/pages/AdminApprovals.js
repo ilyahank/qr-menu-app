@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { useLanguage } from '../contexts/LanguageContext';
 import { supabase } from '../supabase';
 import { useNavigate, Link } from 'react-router-dom';
 import LangSwitcher from '../components/LangSwitcher';
