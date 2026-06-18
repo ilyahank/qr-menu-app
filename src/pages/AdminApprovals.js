@@ -8,10 +8,9 @@ import './AdminApprovals.css';
 
 export default function AdminApprovals() {
   const { userRole, signOut } = useAuth();
-  const { t } = useLanguage();
   const navigate = useNavigate();
   const [requests, setRequests] = useState([]);
-  const [loading, setLoading] = useState(true);
+  
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [adminNotes, setAdminNotes] = useState('');
 
@@ -30,7 +29,7 @@ export default function AdminApprovals() {
     } catch (error) {
       console.error(error);
     }
-    setLoading(false);
+    
   };
 
   const approveRequest = async (request) => {
