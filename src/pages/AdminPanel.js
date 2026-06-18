@@ -7,7 +7,7 @@ import LangSwitcher from '../components/LangSwitcher';
 import './AdminPanel.css';
 
 export default function AdminPanel() {
-  const { currentUser, userRole, signOut } = useAuth();
+  const { userRole, signOut } = useAuth();
   const { t } = useLanguage();
   const navigate = useNavigate();
   const [restaurants, setRestaurants] = useState([]);

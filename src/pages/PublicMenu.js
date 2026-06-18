@@ -40,7 +40,7 @@ export default function PublicMenu() {
       }
     };
     if (restaurantId) fetchMenuData();
-  }, [restaurantId]);
+  }, [restaurantId, t]);
 
   if (loading) return (
     <div className="public-menu loading">
