@@ -22,6 +22,7 @@ import QRCodePage from './pages/QRCodePage';
 
 // Admin Panel
 import AdminPanel from './pages/AdminPanel';
+import AdminRestaurantEditor from './pages/AdminRestaurantEditor';
 
 import './App.css';
 
@@ -47,6 +48,7 @@ function App() {
             
             {/* Admin Routes */}
             <Route path="/admin" element={<AdminRoute><AdminPanel /></AdminRoute>} />
+            <Route path="/admin/restaurant/:restaurantId" element={<AdminRoute><AdminRestaurantEditor /></AdminRoute>} />
             <Route path="/admin/approvals" element={<AdminRoute><AdminApprovals /></AdminRoute>} />
             
             {/* Default redirect */}

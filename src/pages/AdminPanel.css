@@ -203,3 +203,21 @@ tr:last-child td {
     padding: 10px 12px;
   }
 }
+
+.edit-restaurant-btn {
+  padding: 6px 14px;
+  background: #28a745;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+  text-decoration: none;
+  display: inline-block;
+  margin-right: 8px;
+  transition: all 0.3s;
+}
+
+.edit-restaurant-btn:hover {
+  background: #218838;
+}
