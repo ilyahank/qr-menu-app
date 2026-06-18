@@ -1,0 +1,37 @@
+.lang-switcher {
+  display: flex;
+  gap: 4px;
+  background: rgba(255,255,255,0.15);
+  padding: 4px;
+  border-radius: 8px;
+}
+
+.lang-switcher button {
+  padding: 4px 10px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: white;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.lang-switcher button.active {
+  background: white;
+  color: #333;
+}
+
+.admin-nav .lang-switcher {
+  background: rgba(255,255,255,0.1);
+}
+
+.admin-nav .lang-switcher button {
+  color: white;
+}
+
+.admin-nav .lang-switcher button.active {
+  background: white;
+  color: #1a1a2e;
+}
