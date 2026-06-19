@@ -1,14 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { useLanguage } from '../contexts/LanguageContext';
 import { supabase } from '../supabase';
 import { useNavigate, Link } from 'react-router-dom';
 import LangSwitcher from '../components/LangSwitcher';
 import './AdminPanel.css';
 
 export default function AdminPanel() {
-  const { userRole, signOut } = useAuth();
-  useLanguage(); // Language context loaded
+  const { userRole } = useAuth();
   const navigate = useNavigate();
   const [restaurants, setRestaurants] = useState([]);
   const [showForm, setShowForm] = useState(false);
@@ -35,19 +33,7 @@ export default function AdminPanel() {
         .order('created_at', { ascending: false });
       
       if (error) throw error;
-      
-      const restaurantsWithOwners = await Promise.all(
-        (restaurantsData || []).map(async (restaurant) => {
-          const { data: owners } = await supabase
-            .from('users')
-            .select('username')
-            .eq('restaurant_id', restaurant.id)
-            .eq('role', 'owner')
-            .limit(1);
-          return { ...restaurant, ownerUsername: owners?.[0]?.username || '' };
-        })
-      );
-      setRestaurants(restaurantsWithOwners);
+      setRestaurants(restaurantsData || []);
     } catch (error) { 
       console.error(error); 
     }
@@ -81,7 +67,7 @@ export default function AdminPanel() {
       if (restaurantError) throw restaurantError;
 
       // Create user with username and password
-      const { error: userError } = await supabase
+      await supabase
         .from('users')
         .insert([{
           username: formData.username,
@@ -91,16 +77,12 @@ export default function AdminPanel() {
           role: 'owner',
           status: 'approved',
           created_at: new Date()
-        }])
-        .select()
-        .single();
-
-      if (userError) throw userError;
+        }]);
 
       await fetchRestaurants();
       setFormData({ name: '', username: '', password: '', tagline: '', color: '#667eea' });
       setShowForm(false);
-      setMessage('✅ Restaurant owner created successfully!');
+      setMessage('✅ Restaurant created successfully!');
       setTimeout(() => setMessage(''), 5000);
     } catch (error) { 
       setMessage('Error: ' + error.message); 
@@ -147,7 +129,7 @@ export default function AdminPanel() {
         <div className="nav-links">
           <LangSwitcher />
           <Link to="/admin/approvals" className="nav-link">View Requests</Link>
-          <button onClick={signOut} className="logout-btn">Logout</button>
+          <button className="logout-btn">Logout</button>
         </div>
       </nav>
 
@@ -206,7 +188,6 @@ export default function AdminPanel() {
             <thead>
               <tr>
                 <th>Restaurant</th>
-                <th>Owner Username</th>
                 <th>Status</th>
                 <th>Actions</th>
               </tr>
@@ -223,7 +204,6 @@ export default function AdminPanel() {
                       </div>
                     </div>
                   </td>
-                  <td><strong>{restaurant.ownerUsername}</strong></td>
                   <td>
                     <button className={`status-btn ${restaurant.is_active ? 'active' : 'inactive'}`} 
                       onClick={() => toggleActive(restaurant.id, restaurant.is_active)}>
