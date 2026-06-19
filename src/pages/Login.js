@@ -12,7 +12,7 @@ export default function Login() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { signIn, userRole } = useAuth();
-  useLanguage(); // Language context loaded
+  useLanguage();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -41,15 +41,19 @@ export default function Login() {
         return;
       }
 
-      // Check password (simple comparison - use bcrypt in production!)
+      console.log('Found user:', userData);
+      console.log('Entered password:', password);
+      console.log('Stored password:', userData.password);
+
+      // Direct password comparison (plain text)
       if (userData.password !== password) {
-        setError('Password incorrect');
+        setError('Invalid password');
         setLoading(false);
         return;
       }
 
-      // Create session manually
-      await signIn(userData.email || username, password);
+      // Login successful
+      console.log('Login successful for:', username);
       
       if (userData.role === 'admin') {
         navigate('/admin');
@@ -57,7 +61,8 @@ export default function Login() {
         navigate('/dashboard');
       }
     } catch (error) {
-      setError(error.message);
+      console.error('Login error:', error);
+      setError(error.message || 'Login failed');
     }
     setLoading(false);
   };
@@ -71,7 +76,7 @@ export default function Login() {
         {error && <div className="error-message">{error}</div>}
         <form onSubmit={handleSubmit}>
           <div className="form-group">
-            <label>Username *</label>
+            <label>* Username</label>
             <input 
               type="text" 
               value={username} 
@@ -81,7 +86,7 @@ export default function Login() {
             />
           </div>
           <div className="form-group">
-            <label>Password *</label>
+            <label>* Password</label>
             <input 
               type="password" 
               value={password} 
