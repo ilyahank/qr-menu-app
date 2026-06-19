@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../supabase';
 import LangSwitcher from '../components/LangSwitcher';
 import './Login.css';
 
@@ -11,7 +10,7 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { userRole } = useAuth();
+  const { signIn, userRole } = useAuth();
   useLanguage();
   const navigate = useNavigate();
 
@@ -28,34 +27,11 @@ export default function Login() {
     setLoading(true);
 
     try {
-      // Find user by username
-      const { data: userData, error: userError } = await supabase
-        .from('users')
-        .select('*')
-        .eq('username', username)
-        .single();
-
-      if (userError || !userData) {
-        setError('Username not found');
-        setLoading(false);
-        return;
-      }
-
-      console.log('Found user:', userData);
-      console.log('Entered password:', password);
-      console.log('Stored password:', userData.password);
-
-      // Direct password comparison (plain text)
-      if (userData.password !== password) {
-        setError('Invalid password');
-        setLoading(false);
-        return;
-      }
-
-      // Login successful
-      console.log('Login successful for:', username);
+      const user = await signIn(username, password);
+      console.log('Login successful for:', user.username);
       
-      if (userData.role === 'admin') {
+      // Redirect based on role
+      if (user.role === 'admin') {
         navigate('/admin');
       } else {
         navigate('/dashboard');

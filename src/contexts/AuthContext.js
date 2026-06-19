@@ -1,5 +1,5 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
-import { supabase, getCurrentUser, getUserRole } from '../supabase';
+import { supabase } from '../supabase';
 
 const AuthContext = createContext();
 
@@ -13,56 +13,45 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check current session
-    const checkUser = async () => {
-      const user = await getCurrentUser();
-      
-      if (user) {
-        setCurrentUser(user);
-        const role = await getUserRole(user.id);
-        setUserRole(role);
-      } else {
-        setCurrentUser(null);
-        setUserRole(null);
-      }
-      
-      setLoading(false);
-    };
-
-    checkUser();
-
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        if (session?.user) {
-          setCurrentUser(session.user);
-          const role = await getUserRole(session.user.id);
-          setUserRole(role);
-        } else {
-          setCurrentUser(null);
-          setUserRole(null);
-        }
-        setLoading(false);
-      }
-    );
-
-    return () => subscription.unsubscribe();
+    // Check for user in localStorage (our custom session)
+    const storedUser = localStorage.getItem('currentUser');
+    if (storedUser) {
+      const user = JSON.parse(storedUser);
+      setCurrentUser(user);
+      setUserRole(user.role);
+    }
+    setLoading(false);
   }, []);
 
-  // Sign in function
-  const signIn = async (email, password) => {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password
-    });
-    if (error) throw error;
-    return data;
+  const signIn = async (username, password) => {
+    // Find user by username
+    const { data: userData, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('username', username)
+      .single();
+
+    if (error || !userData) {
+      throw new Error('User not found');
+    }
+
+    // Verify password
+    if (userData.password !== password) {
+      throw new Error('Invalid password');
+    }
+
+    // Store user in localStorage
+    localStorage.setItem('currentUser', JSON.stringify(userData));
+    setCurrentUser(userData);
+    setUserRole(userData.role);
+
+    return userData;
   };
 
-  // Sign out function
   const signOut = async () => {
-    const { error } = await supabase.auth.signOut();
-    if (error) throw error;
+    localStorage.removeItem('currentUser');
+    setCurrentUser(null);
+    setUserRole(null);
   };
 
   const value = {
