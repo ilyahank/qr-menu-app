@@ -5,6 +5,17 @@ import { useNavigate, Link } from 'react-router-dom';
 import LangSwitcher from '../components/LangSwitcher';
 import './AdminPanel.css';
 
+const generateUUID = () => {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : ((r & 0x3) | 0x8);
+    return v.toString(16);
+  });
+};
+
 export default function AdminPanel() {
   const { userRole, signOut, impersonate } = useAuth();
   const navigate = useNavigate();
@@ -20,6 +31,9 @@ export default function AdminPanel() {
   });
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
+  const [showCreateOwner, setShowCreateOwner] = useState(false);
+  const [selectedRestForOwner, setSelectedRestForOwner] = useState(null);
+  const [ownerForm, setOwnerForm] = useState({ username: '', password: '' });
 
   useEffect(() => {
     if (userRole && userRole !== 'admin') navigate('/dashboard');
@@ -100,7 +114,7 @@ export default function AdminPanel() {
       if (restaurantError) throw restaurantError;
 
       // Create user with ID
-      const userId = crypto.randomUUID ? crypto.randomUUID() : 'user-' + Date.now();
+      const userId = generateUUID();
       
       const { error: userError } = await supabase
         .from('users')
@@ -216,13 +230,72 @@ export default function AdminPanel() {
       if (error) throw error;
 
       if (!ownerData) {
-        alert('❌ Error: No owner user found for this restaurant. Cannot impersonate.');
+        const restaurantObj = restaurants.find(r => r.id === restaurantId);
+        if (window.confirm(`❌ Error: No owner user found for ${restaurantObj?.name || 'this restaurant'}. Would you like to create one now?`)) {
+          handleOpenCreateOwner(restaurantObj);
+        }
         return;
       }
 
       // Impersonate owner
       await impersonate(ownerData);
       navigate('/dashboard');
+    } catch (error) {
+      alert('❌ Error: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleOpenCreateOwner = (restaurant) => {
+    setSelectedRestForOwner(restaurant);
+    setOwnerForm({ username: '', password: '' });
+    setShowCreateOwner(true);
+  };
+
+  const handleOwnerInputChange = (e) => {
+    const { name, value } = e.target;
+    setOwnerForm(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleCreateOwner = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const normalizedUsername = ownerForm.username.trim().toLowerCase();
+
+      // Check if username already exists
+      const { data: existingUser } = await supabase
+        .from('users')
+        .select('id')
+        .ilike('username', normalizedUsername);
+
+      if (existingUser && existingUser.length > 0) {
+        alert('❌ Error: Username already exists! Choose a different one.');
+        setLoading(false);
+        return;
+      }
+
+      const userId = generateUUID();
+      const { error: userError } = await supabase
+        .from('users')
+        .insert([{
+          id: userId,
+          username: normalizedUsername,
+          password: ownerForm.password,
+          email: `${normalizedUsername}@qrmenu.local`,
+          restaurant_id: selectedRestForOwner.id,
+          role: 'owner',
+          status: 'approved',
+          created_at: new Date()
+        }]);
+
+      if (userError) throw userError;
+
+      alert('✅ Owner account created successfully!');
+      setShowCreateOwner(false);
+      setOwnerForm({ username: '', password: '' });
+      await fetchRestaurants();
     } catch (error) {
       alert('❌ Error: ' + error.message);
     } finally {
@@ -311,6 +384,45 @@ export default function AdminPanel() {
           </div>
         )}
 
+        {showCreateOwner && selectedRestForOwner && (
+          <div className="modal">
+            <div className="modal-content">
+              <h2>Create Owner for {selectedRestForOwner.name}</h2>
+              <form onSubmit={handleCreateOwner}>
+                <div className="form-group">
+                  <label>Owner Username * (Must be unique)</label>
+                  <input 
+                    type="text" 
+                    name="username" 
+                    value={ownerForm.username} 
+                    onChange={handleOwnerInputChange} 
+                    required 
+                    placeholder="e.g., pizzamaster" 
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Owner Password *</label>
+                  <input 
+                    type="password" 
+                    name="password" 
+                    value={ownerForm.password} 
+                    onChange={handleOwnerInputChange} 
+                    required 
+                    minLength="6" 
+                    placeholder="Min 6 characters" 
+                  />
+                </div>
+
+                <div className="form-actions">
+                  <button type="button" onClick={() => setShowCreateOwner(false)} className="cancel-btn">Cancel</button>
+                  <button type="submit" className="submit-btn" disabled={loading}>{loading ? 'Creating...' : 'Create Owner'}</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
         <div className="restaurants-table">
           <table>
             <thead>
@@ -334,8 +446,24 @@ export default function AdminPanel() {
                               👤 {restaurant.users.map(u => u.username || u.email).join(', ')}
                             </div>
                           ) : (
-                            <div className="restaurant-owner-info no-owner" style={{ fontSize: '13px', color: '#ff4444', fontStyle: 'italic', marginTop: '2px' }}>
-                              No Owner Account
+                            <div className="restaurant-owner-info no-owner" style={{ fontSize: '13px', color: '#ff4444', fontStyle: 'italic', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <span>No Owner Account</span>
+                              <button 
+                                onClick={() => handleOpenCreateOwner(restaurant)}
+                                style={{
+                                  padding: '2px 8px',
+                                  fontSize: '11px',
+                                  backgroundColor: '#e53e3e',
+                                  color: '#fff',
+                                  border: 'none',
+                                  borderRadius: '4px',
+                                  cursor: 'pointer',
+                                  fontStyle: 'normal',
+                                  fontWeight: '500'
+                                }}
+                              >
+                                Create Owner
+                              </button>
                             </div>
                           )}
                           <div className="restaurant-tagline" style={{ marginTop: '2px' }}>{restaurant.tagline}</div>
