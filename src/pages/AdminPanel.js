@@ -50,6 +50,19 @@ export default function AdminPanel() {
     setMessage('');
 
     try {
+      // Check if username already exists
+      const { data: existingUser } = await supabase
+        .from('users')
+        .select('id')
+        .eq('username', formData.username)
+        .single();
+
+      if (existingUser) {
+        setMessage('Error: Username already exists! Choose a different one.');
+        setLoading(false);
+        return;
+      }
+
       // Create restaurant
       const { data: restaurantData, error: restaurantError } = await supabase
         .from('restaurants')
@@ -67,7 +80,7 @@ export default function AdminPanel() {
       if (restaurantError) throw restaurantError;
 
       // Create user with username and password
-      await supabase
+      const { error: userError } = await supabase
         .from('users')
         .insert([{
           username: formData.username,
@@ -78,6 +91,8 @@ export default function AdminPanel() {
           status: 'approved',
           created_at: new Date()
         }]);
+
+      if (userError) throw userError;
 
       await fetchRestaurants();
       setFormData({ name: '', username: '', password: '', tagline: '', color: '#667eea' });
@@ -107,13 +122,24 @@ export default function AdminPanel() {
   };
 
   const deleteRestaurant = async (restaurantId) => {
-    if (window.confirm('Delete this restaurant and all data?')) {
+    if (window.confirm('Delete this restaurant and all data? This cannot be undone!')) {
       try {
+        // Delete in correct order (child tables first)
         await supabase.from('menu_items').delete().eq('restaurant_id', restaurantId);
         await supabase.from('categories').delete().eq('restaurant_id', restaurantId);
         await supabase.from('users').delete().eq('restaurant_id', restaurantId);
-        await supabase.from('restaurants').delete().eq('id', restaurantId);
+        
+        // Finally delete restaurant
+        const { error: deleteError } = await supabase
+          .from('restaurants')
+          .delete()
+          .eq('id', restaurantId);
+
+        if (deleteError) throw deleteError;
+
+        // Remove from local state immediately
         setRestaurants(restaurants.filter(r => r.id !== restaurantId));
+        alert('✅ Restaurant deleted successfully!');
       } catch (error) { 
         alert('Error: ' + error.message); 
       }
@@ -152,7 +178,7 @@ export default function AdminPanel() {
                 </div>
 
                 <div className="form-group">
-                  <label>Owner Username *</label>
+                  <label>Owner Username * (Must be unique)</label>
                   <input type="text" name="username" value={formData.username} onChange={handleInputChange} required placeholder="e.g., pizzamaster" />
                 </div>
 
@@ -193,40 +219,38 @@ export default function AdminPanel() {
               </tr>
             </thead>
             <tbody>
-              {restaurants.map(restaurant => (
-                <tr key={restaurant.id}>
-                  <td>
-                    <div className="restaurant-info">
-                      <div className="color-dot" style={{ backgroundColor: restaurant.color || '#667eea' }} />
-                      <div>
-                        <div className="restaurant-name">{restaurant.name}</div>
-                        <div className="restaurant-tagline">{restaurant.tagline}</div>
+              {restaurants.length > 0 ? (
+                restaurants.map(restaurant => (
+                  <tr key={restaurant.id}>
+                    <td>
+                      <div className="restaurant-info">
+                        <div className="color-dot" style={{ backgroundColor: restaurant.color || '#667eea' }} />
+                        <div>
+                          <div className="restaurant-name">{restaurant.name}</div>
+                          <div className="restaurant-tagline">{restaurant.tagline}</div>
+                        </div>
                       </div>
-                    </div>
-                  </td>
-                  <td>
-                    <button className={`status-btn ${restaurant.is_active ? 'active' : 'inactive'}`} 
-                      onClick={() => toggleActive(restaurant.id, restaurant.is_active)}>
-                      {restaurant.is_active ? 'Active' : 'Inactive'}
-                    </button>
-                  </td>
-                  <td>
-                    <div className="action-buttons">
-                      <Link to={`/admin/restaurant/${restaurant.id}`} className="edit-restaurant-btn">Edit Menu</Link>
-                      <button onClick={() => deleteRestaurant(restaurant.id)} className="delete-btn">Delete</button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td>
+                      <button className={`status-btn ${restaurant.is_active ? 'active' : 'inactive'}`} 
+                        onClick={() => toggleActive(restaurant.id, restaurant.is_active)}>
+                        {restaurant.is_active ? 'Active' : 'Inactive'}
+                      </button>
+                    </td>
+                    <td>
+                      <div className="action-buttons">
+                        <Link to={`/admin/restaurant/${restaurant.id}`} className="edit-restaurant-btn">Edit Menu</Link>
+                        <button onClick={() => deleteRestaurant(restaurant.id)} className="delete-btn">Delete</button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr><td colSpan="3" style={{textAlign: 'center', padding: '20px'}}>No restaurants yet</td></tr>
+              )}
             </tbody>
           </table>
         </div>
-
-        {restaurants.length === 0 && !showForm && (
-          <div className="empty-state">
-            <p>No restaurants yet. Create one to get started!</p>
-          </div>
-        )}
       </div>
     </div>
   );
