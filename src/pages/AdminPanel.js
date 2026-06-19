@@ -54,11 +54,10 @@ export default function AdminPanel() {
       const { data: existingUser } = await supabase
         .from('users')
         .select('id')
-        .eq('username', formData.username)
-        .single();
+        .eq('username', formData.username);
 
-      if (existingUser) {
-        setMessage('Error: Username already exists! Choose a different one.');
+      if (existingUser && existingUser.length > 0) {
+        setMessage('❌ Error: Username already exists! Choose a different one.');
         setLoading(false);
         return;
       }
@@ -79,10 +78,13 @@ export default function AdminPanel() {
 
       if (restaurantError) throw restaurantError;
 
-      // Create user with username and password
+      // Create user with ID
+      const userId = crypto.randomUUID ? crypto.randomUUID() : 'user-' + Date.now();
+      
       const { error: userError } = await supabase
         .from('users')
         .insert([{
+          id: userId,
           username: formData.username,
           password: formData.password,
           email: `${formData.username}@qrmenu.local`,
@@ -94,13 +96,14 @@ export default function AdminPanel() {
 
       if (userError) throw userError;
 
+      // Refresh list immediately
       await fetchRestaurants();
       setFormData({ name: '', username: '', password: '', tagline: '', color: '#667eea' });
       setShowForm(false);
       setMessage('✅ Restaurant created successfully!');
       setTimeout(() => setMessage(''), 5000);
     } catch (error) { 
-      setMessage('Error: ' + error.message); 
+      setMessage('❌ Error: ' + error.message); 
     }
     setLoading(false);
   };
@@ -122,11 +125,15 @@ export default function AdminPanel() {
   };
 
   const deleteRestaurant = async (restaurantId) => {
-    if (window.confirm('Delete this restaurant and all data? This cannot be undone!')) {
+    if (window.confirm('⚠️ Delete this restaurant and ALL its data? This CANNOT be undone!')) {
       try {
-        // Delete in correct order (child tables first)
+        // Delete menu items first
         await supabase.from('menu_items').delete().eq('restaurant_id', restaurantId);
+        
+        // Delete categories
         await supabase.from('categories').delete().eq('restaurant_id', restaurantId);
+        
+        // Delete users
         await supabase.from('users').delete().eq('restaurant_id', restaurantId);
         
         // Finally delete restaurant
@@ -135,13 +142,19 @@ export default function AdminPanel() {
           .delete()
           .eq('id', restaurantId);
 
-        if (deleteError) throw deleteError;
+        if (deleteError) {
+          alert('❌ Delete failed: ' + deleteError.message);
+          return;
+        }
 
-        // Remove from local state immediately
-        setRestaurants(restaurants.filter(r => r.id !== restaurantId));
+        // Update state immediately
+        setRestaurants(prev => prev.filter(r => r.id !== restaurantId));
         alert('✅ Restaurant deleted successfully!');
+        
+        // Refresh to be sure
+        setTimeout(() => fetchRestaurants(), 1000);
       } catch (error) { 
-        alert('Error: ' + error.message); 
+        alert('❌ Error: ' + error.message); 
       }
     }
   };
@@ -165,7 +178,7 @@ export default function AdminPanel() {
           <button onClick={() => setShowForm(true)} className="add-btn">+ Create New Restaurant</button>
         </div>
 
-        {message && <div className={`message ${message.includes('Error') ? 'error' : 'success'}`}>{message}</div>}
+        {message && <div className={`message ${message.includes('Error') || message.includes('❌') ? 'error' : 'success'}`}>{message}</div>}
 
         {showForm && (
           <div className="modal">
@@ -246,7 +259,7 @@ export default function AdminPanel() {
                   </tr>
                 ))
               ) : (
-                <tr><td colSpan="3" style={{textAlign: 'center', padding: '20px'}}>No restaurants yet</td></tr>
+                <tr><td colSpan="3" style={{textAlign: 'center', padding: '20px', color: '#999'}}>No restaurants yet. Create one to get started!</td></tr>
               )}
             </tbody>
           </table>
