@@ -12,13 +12,28 @@ export const getCurrentUser = async () => {
 
 export const getUserRole = async (userId) => {
   console.log('getUserRole called with:', userId);
-  const { data, error } = await supabase
-    .from('users')
-    .select('role')
-    .eq('id', userId)
-    .single();
-  
-  console.log('getUserRole result:', data, 'error:', error);
-  if (error) return null;
-  return data?.role || 'owner';
+  try {
+    const { data, error } = await supabase
+      .from('users')
+      .select('role, email')
+      .eq('id', userId)
+      .single();
+    
+    console.log('getUserRole result:', data, 'error:', error);
+    
+    if (error) {
+      console.error('Error fetching role:', error);
+      return 'owner';
+    }
+    
+    // Check if it's the admin email
+    if (data?.email === 'ilyashannouna@gmail.com') {
+      return 'admin';
+    }
+    
+    return data?.role || 'owner';
+  } catch (error) {
+    console.error('Exception in getUserRole:', error);
+    return 'owner';
+  }
 };
