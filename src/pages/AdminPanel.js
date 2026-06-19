@@ -6,9 +6,10 @@ import LangSwitcher from '../components/LangSwitcher';
 import './AdminPanel.css';
 
 export default function AdminPanel() {
-  const { userRole } = useAuth();
+  const { userRole, signOut, impersonate } = useAuth();
   const navigate = useNavigate();
   const [restaurants, setRestaurants] = useState([]);
+  const [searchTerm, setSearchTerm] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({ 
     name: '', 
@@ -29,7 +30,7 @@ export default function AdminPanel() {
     try {
       const { data: restaurantsData, error } = await supabase
         .from('restaurants')
-        .select('*')
+        .select('*, users (username, email, role)')
         .order('created_at', { ascending: false });
       
       if (error) throw error;
@@ -50,11 +51,13 @@ export default function AdminPanel() {
     setMessage('');
 
     try {
-      // Check if username already exists
+      const normalizedUsername = formData.username.trim().toLowerCase();
+
+      // Check if username already exists (case-insensitive)
       const { data: existingUser } = await supabase
         .from('users')
         .select('id')
-        .eq('username', formData.username);
+        .ilike('username', normalizedUsername);
 
       if (existingUser && existingUser.length > 0) {
         setMessage('❌ Error: Username already exists! Choose a different one.');
@@ -85,9 +88,9 @@ export default function AdminPanel() {
         .from('users')
         .insert([{
           id: userId,
-          username: formData.username,
+          username: normalizedUsername,
           password: formData.password,
-          email: `${formData.username}@qrmenu.local`,
+          email: `${normalizedUsername}@qrmenu.local`,
           restaurant_id: restaurantData.id,
           role: 'owner',
           status: 'approved',
@@ -127,6 +130,16 @@ export default function AdminPanel() {
   const deleteRestaurant = async (restaurantId) => {
     if (window.confirm('⚠️ Delete this restaurant and ALL its data? This CANNOT be undone!')) {
       try {
+        setLoading(true);
+        // Get emails of the users of this restaurant first
+        const { data: usersToDelete, error: fetchUsersError } = await supabase
+          .from('users')
+          .select('email')
+          .eq('restaurant_id', restaurantId);
+
+        if (fetchUsersError) throw fetchUsersError;
+        const emails = usersToDelete?.map(u => u.email).filter(Boolean) || [];
+
         // Delete menu items first
         await supabase.from('menu_items').delete().eq('restaurant_id', restaurantId);
         
@@ -135,6 +148,14 @@ export default function AdminPanel() {
         
         // Delete users
         await supabase.from('users').delete().eq('restaurant_id', restaurantId);
+
+        // Delete subscription requests matching those emails
+        if (emails.length > 0) {
+          await supabase
+            .from('subscription_requests')
+            .delete()
+            .in('email', emails);
+        }
         
         // Finally delete restaurant
         const { error: deleteError } = await supabase
@@ -144,6 +165,7 @@ export default function AdminPanel() {
 
         if (deleteError) {
           alert('❌ Delete failed: ' + deleteError.message);
+          setLoading(false);
           return;
         }
 
@@ -155,9 +177,49 @@ export default function AdminPanel() {
         setTimeout(() => fetchRestaurants(), 1000);
       } catch (error) { 
         alert('❌ Error: ' + error.message); 
+      } finally {
+        setLoading(false);
       }
     }
   };
+
+  const handleImpersonate = async (restaurantId) => {
+    try {
+      setLoading(true);
+      // Fetch owner of this restaurant
+      const { data: ownerData, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('restaurant_id', restaurantId)
+        .eq('role', 'owner')
+        .limit(1)
+        .maybeSingle();
+
+      if (error) throw error;
+
+      if (!ownerData) {
+        alert('❌ Error: No owner user found for this restaurant. Cannot impersonate.');
+        return;
+      }
+
+      // Impersonate owner
+      await impersonate(ownerData);
+      navigate('/dashboard');
+    } catch (error) {
+      alert('❌ Error: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filteredRestaurants = restaurants.filter(r => {
+    if (!searchTerm.trim()) return true;
+    const term = searchTerm.toLowerCase();
+    const matchesName = r.name?.toLowerCase().includes(term);
+    const matchesUsername = r.users?.some(u => u.username?.toLowerCase().includes(term));
+    const matchesEmail = r.users?.some(u => u.email?.toLowerCase().includes(term));
+    return matchesName || matchesUsername || matchesEmail;
+  });
 
   if (userRole !== 'admin') return <div>Loading...</div>;
 
@@ -168,14 +230,23 @@ export default function AdminPanel() {
         <div className="nav-links">
           <LangSwitcher />
           <Link to="/admin/approvals" className="nav-link">View Requests</Link>
-          <button className="logout-btn">Logout</button>
+          <button onClick={signOut} className="logout-btn">Logout</button>
         </div>
       </nav>
 
       <div className="admin-content">
         <div className="admin-header">
           <h1>Restaurant Management</h1>
-          <button onClick={() => setShowForm(true)} className="add-btn">+ Create New Restaurant</button>
+          <div className="admin-controls">
+            <input 
+              type="text" 
+              placeholder="Search by restaurant or username..." 
+              value={searchTerm} 
+              onChange={(e) => setSearchTerm(e.target.value)} 
+              className="search-input"
+            />
+            <button onClick={() => setShowForm(true)} className="add-btn">+ Create New Restaurant</button>
+          </div>
         </div>
 
         {message && <div className={`message ${message.includes('Error') || message.includes('❌') ? 'error' : 'success'}`}>{message}</div>}
@@ -232,15 +303,24 @@ export default function AdminPanel() {
               </tr>
             </thead>
             <tbody>
-              {restaurants.length > 0 ? (
-                restaurants.map(restaurant => (
+              {filteredRestaurants.length > 0 ? (
+                filteredRestaurants.map(restaurant => (
                   <tr key={restaurant.id}>
                     <td>
                       <div className="restaurant-info">
                         <div className="color-dot" style={{ backgroundColor: restaurant.color || '#667eea' }} />
                         <div>
                           <div className="restaurant-name">{restaurant.name}</div>
-                          <div className="restaurant-tagline">{restaurant.tagline}</div>
+                          {restaurant.users && restaurant.users.length > 0 ? (
+                            <div className="restaurant-owner-info" style={{ fontSize: '13px', color: '#555', marginTop: '2px' }}>
+                              👤 {restaurant.users.map(u => u.username || u.email).join(', ')}
+                            </div>
+                          ) : (
+                            <div className="restaurant-owner-info no-owner" style={{ fontSize: '13px', color: '#ff4444', fontStyle: 'italic', marginTop: '2px' }}>
+                              No Owner Account
+                            </div>
+                          )}
+                          <div className="restaurant-tagline" style={{ marginTop: '2px' }}>{restaurant.tagline}</div>
                         </div>
                       </div>
                     </td>
@@ -252,6 +332,9 @@ export default function AdminPanel() {
                     </td>
                     <td>
                       <div className="action-buttons">
+                        <button onClick={() => handleImpersonate(restaurant.id)} className="impersonate-btn" disabled={loading}>
+                          Enter Owner View
+                        </button>
                         <Link to={`/admin/restaurant/${restaurant.id}`} className="edit-restaurant-btn">Edit Menu</Link>
                         <button onClick={() => deleteRestaurant(restaurant.id)} className="delete-btn">Delete</button>
                       </div>
@@ -259,7 +342,7 @@ export default function AdminPanel() {
                   </tr>
                 ))
               ) : (
-                <tr><td colSpan="3" style={{textAlign: 'center', padding: '20px', color: '#999'}}>No restaurants yet. Create one to get started!</td></tr>
+                <tr><td colSpan="3" style={{textAlign: 'center', padding: '20px', color: '#999'}}>No restaurants found.</td></tr>
               )}
             </tbody>
           </table>

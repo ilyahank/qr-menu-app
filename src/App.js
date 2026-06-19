@@ -18,12 +18,56 @@ import Settings from './pages/Settings';
 import QRCodePage from './pages/QRCodePage';
 
 import './App.css';
+import { useAuth } from './contexts/AuthContext';
+
+function ImpersonationBanner() {
+  const { currentUser, exitImpersonation } = useAuth();
+  const isAdminImpersonating = localStorage.getItem('adminUser');
+
+  if (!isAdminImpersonating) return null;
+
+  return (
+    <div className="impersonation-banner" style={{
+      backgroundColor: '#e02424',
+      color: '#fff',
+      padding: '12px 20px',
+      textAlign: 'center',
+      fontWeight: '600',
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      zIndex: 99999,
+      position: 'sticky',
+      top: 0,
+      fontFamily: 'sans-serif',
+      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+    }}>
+      <span>⚠️ Impersonating Owner: {currentUser?.username || currentUser?.email}</span>
+      <button onClick={() => {
+        exitImpersonation();
+        window.location.href = '/admin';
+      }} style={{
+        backgroundColor: '#fff',
+        color: '#e02424',
+        border: 'none',
+        padding: '6px 14px',
+        borderRadius: '6px',
+        cursor: 'pointer',
+        fontWeight: 'bold',
+        transition: 'all 0.2s'
+      }}>
+        Return to Admin Panel
+      </button>
+    </div>
+  );
+}
 
 function App() {
   return (
     <LanguageProvider>
       <AuthProvider>
         <Router>
+          <ImpersonationBanner />
           <Routes>
             {/* Public Routes */}
             <Route path="/r/:restaurantId" element={<PublicMenu />} />

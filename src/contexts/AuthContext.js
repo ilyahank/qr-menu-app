@@ -23,12 +23,12 @@ export function AuthProvider({ children }) {
     setLoading(false);
   }, []);
 
-  const signIn = async (username, password) => {
-    // Find user by username
+  const signIn = async (usernameOrEmail, password) => {
+    // Find user by username or email
     const { data: userData, error } = await supabase
       .from('users')
       .select('*')
-      .eq('username', username)
+      .or(`username.eq.${usernameOrEmail},email.eq.${usernameOrEmail}`)
       .single();
 
     if (error || !userData) {
@@ -50,8 +50,31 @@ export function AuthProvider({ children }) {
 
   const signOut = async () => {
     localStorage.removeItem('currentUser');
+    localStorage.removeItem('adminUser');
     setCurrentUser(null);
     setUserRole(null);
+  };
+
+  const impersonate = async (ownerUser) => {
+    // Store current admin user as adminUser
+    if (currentUser && userRole === 'admin') {
+      localStorage.setItem('adminUser', JSON.stringify(currentUser));
+    }
+    // Set the impersonated owner as current user
+    localStorage.setItem('currentUser', JSON.stringify(ownerUser));
+    setCurrentUser(ownerUser);
+    setUserRole('owner');
+  };
+
+  const exitImpersonation = async () => {
+    const storedAdmin = localStorage.getItem('adminUser');
+    if (storedAdmin) {
+      const adminUser = JSON.parse(storedAdmin);
+      localStorage.setItem('currentUser', JSON.stringify(adminUser));
+      localStorage.removeItem('adminUser');
+      setCurrentUser(adminUser);
+      setUserRole('admin');
+    }
   };
 
   const value = {
@@ -59,7 +82,9 @@ export function AuthProvider({ children }) {
     userRole,
     loading,
     signIn,
-    signOut
+    signOut,
+    impersonate,
+    exitImpersonation
   };
 
   return (
