@@ -12,7 +12,13 @@ export default function AdminPanel() {
   const navigate = useNavigate();
   const [restaurants, setRestaurants] = useState([]);
   const [showForm, setShowForm] = useState(false);
-  const [formData, setFormData] = useState({ name: '', email: '', password: '', tagline: '', color: '#667eea' });
+  const [formData, setFormData] = useState({ 
+    name: '', 
+    username: '', 
+    password: '', 
+    tagline: '', 
+    color: '#667eea' 
+  });
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
 
@@ -23,16 +29,28 @@ export default function AdminPanel() {
 
   const fetchRestaurants = async () => {
     try {
-      const { data: restaurantsData, error } = await supabase.from('restaurants').select('*').order('created_at', { ascending: false });
+      const { data: restaurantsData, error } = await supabase
+        .from('restaurants')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
       if (error) throw error;
+      
       const restaurantsWithOwners = await Promise.all(
         (restaurantsData || []).map(async (restaurant) => {
-          const { data: owners } = await supabase.from('users').select('email').eq('restaurant_id', restaurant.id).eq('role', 'owner').limit(1);
-          return { ...restaurant, ownerEmail: owners?.[0]?.email || '' };
+          const { data: owners } = await supabase
+            .from('users')
+            .select('username')
+            .eq('restaurant_id', restaurant.id)
+            .eq('role', 'owner')
+            .limit(1);
+          return { ...restaurant, ownerUsername: owners?.[0]?.username || '' };
         })
       );
       setRestaurants(restaurantsWithOwners);
-    } catch (error) { console.error(error); }
+    } catch (error) { 
+      console.error(error); 
+    }
   };
 
   const handleInputChange = (e) => {
@@ -44,49 +62,79 @@ export default function AdminPanel() {
     e.preventDefault();
     setLoading(true);
     setMessage('');
+
     try {
-      const { data: restaurantData, error: restaurantError } = await supabase.from('restaurants').insert([{
-        name: formData.name, tagline: formData.tagline || '', color: formData.color, logo: '', is_active: true, created_at: new Date()
-      }]).select().single();
+      // Create restaurant
+      const { data: restaurantData, error: restaurantError } = await supabase
+        .from('restaurants')
+        .insert([{
+          name: formData.name,
+          tagline: formData.tagline || '',
+          color: formData.color,
+          logo: '',
+          is_active: true,
+          created_at: new Date()
+        }])
+        .select()
+        .single();
+
       if (restaurantError) throw restaurantError;
 
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: formData.email, password: formData.password,
-        options: { data: { restaurant_id: restaurantData.id, role: 'owner' } }
-      });
-      if (authError) throw authError;
+      // Create user with username and password
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .insert([{
+          username: formData.username,
+          password: formData.password,
+          email: `${formData.username}@qrmenu.local`,
+          restaurant_id: restaurantData.id,
+          role: 'owner',
+          status: 'approved',
+          created_at: new Date()
+        }])
+        .select()
+        .single();
 
-      if (authData?.user?.id) {
-        await supabase.from('users').insert([{
-          id: authData.user.id, email: formData.email, restaurant_id: restaurantData.id, role: 'owner', status: 'approved', created_at: new Date()
-        }]);
-      }
+      if (userError) throw userError;
 
       await fetchRestaurants();
-      setFormData({ name: '', email: '', password: '', tagline: '', color: '#667eea' });
+      setFormData({ name: '', username: '', password: '', tagline: '', color: '#667eea' });
       setShowForm(false);
-      setMessage(t.restaurantCreated);
+      setMessage('✅ Restaurant owner created successfully!');
       setTimeout(() => setMessage(''), 5000);
-    } catch (error) { setMessage('Error: ' + error.message); }
+    } catch (error) { 
+      setMessage('Error: ' + error.message); 
+    }
     setLoading(false);
   };
 
   const toggleActive = async (restaurantId, currentStatus) => {
     try {
-      const { error } = await supabase.from('restaurants').update({ is_active: !currentStatus }).eq('id', restaurantId);
+      const { error } = await supabase
+        .from('restaurants')
+        .update({ is_active: !currentStatus })
+        .eq('id', restaurantId);
+      
       if (error) throw error;
-      setRestaurants(restaurants.map(r => r.id === restaurantId ? { ...r, is_active: !currentStatus } : r));
-    } catch (error) { alert('Error: ' + error.message); }
+      setRestaurants(restaurants.map(r => 
+        r.id === restaurantId ? { ...r, is_active: !currentStatus } : r
+      ));
+    } catch (error) { 
+      alert('Error: ' + error.message); 
+    }
   };
 
   const deleteRestaurant = async (restaurantId) => {
-    if (window.confirm(t.confirmDelete)) {
+    if (window.confirm('Delete this restaurant and all data?')) {
       try {
         await supabase.from('menu_items').delete().eq('restaurant_id', restaurantId);
         await supabase.from('categories').delete().eq('restaurant_id', restaurantId);
+        await supabase.from('users').delete().eq('restaurant_id', restaurantId);
         await supabase.from('restaurants').delete().eq('id', restaurantId);
         setRestaurants(restaurants.filter(r => r.id !== restaurantId));
-      } catch (error) { alert('Error: ' + error.message); }
+      } catch (error) { 
+        alert('Error: ' + error.message); 
+      }
     }
   };
 
@@ -95,63 +143,72 @@ export default function AdminPanel() {
   return (
     <div className="admin-panel">
       <nav className="admin-nav">
-        <div className="nav-brand"><h2>{t.adminPanel}</h2></div>
+        <div className="nav-brand"><h2>Admin Panel</h2></div>
         <div className="nav-links">
           <LangSwitcher />
-          <Link to="/admin/approvals" className="nav-link">Approvals</Link>
-          <button onClick={signOut} className="logout-btn">{t.logout}</button>
+          <Link to="/admin/approvals" className="nav-link">View Requests</Link>
+          <button onClick={signOut} className="logout-btn">Logout</button>
         </div>
       </nav>
+
       <div className="admin-content">
         <div className="admin-header">
-          <h1>{t.restaurantManagement}</h1>
-          <button onClick={() => setShowForm(true)} className="add-btn">{t.newRestaurant}</button>
+          <h1>Restaurant Management</h1>
+          <button onClick={() => setShowForm(true)} className="add-btn">+ Create New Restaurant</button>
         </div>
+
         {message && <div className={`message ${message.includes('Error') ? 'error' : 'success'}`}>{message}</div>}
+
         {showForm && (
           <div className="modal">
             <div className="modal-content">
-              <h2>{t.createNewRestaurant}</h2>
+              <h2>Create New Restaurant</h2>
               <form onSubmit={handleSubmit}>
                 <div className="form-group">
-                  <label>{t.restaurantName} *</label>
+                  <label>Restaurant Name *</label>
                   <input type="text" name="name" value={formData.name} onChange={handleInputChange} required />
                 </div>
+
                 <div className="form-group">
-                  <label>{t.ownerEmail} *</label>
-                  <input type="email" name="email" value={formData.email} onChange={handleInputChange} required />
+                  <label>Owner Username *</label>
+                  <input type="text" name="username" value={formData.username} onChange={handleInputChange} required placeholder="e.g., pizzamaster" />
                 </div>
+
                 <div className="form-group">
-                  <label>{t.password} *</label>
-                  <input type="password" name="password" value={formData.password} onChange={handleInputChange} required minLength="6" />
+                  <label>Owner Password *</label>
+                  <input type="password" name="password" value={formData.password} onChange={handleInputChange} required minLength="6" placeholder="Min 6 characters" />
                 </div>
+
                 <div className="form-group">
-                  <label>{t.tagline}</label>
+                  <label>Tagline</label>
                   <input type="text" name="tagline" value={formData.tagline} onChange={handleInputChange} />
                 </div>
+
                 <div className="form-group">
-                  <label>{t.themeColor}</label>
+                  <label>Theme Color</label>
                   <div className="color-picker-wrapper">
                     <input type="color" name="color" value={formData.color} onChange={handleInputChange} className="color-picker" />
                     <span className="color-value">{formData.color}</span>
                   </div>
                 </div>
+
                 <div className="form-actions">
-                  <button type="button" onClick={() => setShowForm(false)} className="cancel-btn">{t.cancel}</button>
-                  <button type="submit" className="submit-btn" disabled={loading}>{loading ? t.creating : t.createRestaurant}</button>
+                  <button type="button" onClick={() => setShowForm(false)} className="cancel-btn">Cancel</button>
+                  <button type="submit" className="submit-btn" disabled={loading}>{loading ? 'Creating...' : 'Create'}</button>
                 </div>
               </form>
             </div>
           </div>
         )}
+
         <div className="restaurants-table">
           <table>
             <thead>
               <tr>
-                <th>{t.restaurant}</th>
-                <th>{t.owner}</th>
-                <th>{t.status}</th>
-                <th>{t.actions}</th>
+                <th>Restaurant</th>
+                <th>Owner Username</th>
+                <th>Status</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -166,16 +223,17 @@ export default function AdminPanel() {
                       </div>
                     </div>
                   </td>
-                  <td>{restaurant.ownerEmail}</td>
+                  <td><strong>{restaurant.ownerUsername}</strong></td>
                   <td>
-                    <button className={`status-btn ${restaurant.is_active ? 'active' : 'inactive'}`} onClick={() => toggleActive(restaurant.id, restaurant.is_active)}>
-                      {restaurant.is_active ? t.active : t.inactive}
+                    <button className={`status-btn ${restaurant.is_active ? 'active' : 'inactive'}`} 
+                      onClick={() => toggleActive(restaurant.id, restaurant.is_active)}>
+                      {restaurant.is_active ? 'Active' : 'Inactive'}
                     </button>
                   </td>
                   <td>
                     <div className="action-buttons">
                       <Link to={`/admin/restaurant/${restaurant.id}`} className="edit-restaurant-btn">Edit Menu</Link>
-                      <button onClick={() => deleteRestaurant(restaurant.id)} className="delete-btn">{t.delete}</button>
+                      <button onClick={() => deleteRestaurant(restaurant.id)} className="delete-btn">Delete</button>
                     </div>
                   </td>
                 </tr>
@@ -183,7 +241,12 @@ export default function AdminPanel() {
             </tbody>
           </table>
         </div>
-        {restaurants.length === 0 && !showForm && <div className="empty-state"><p>{t.noRestaurantsYet}</p></div>}
+
+        {restaurants.length === 0 && !showForm && (
+          <div className="empty-state">
+            <p>No restaurants yet. Create one to get started!</p>
+          </div>
+        )}
       </div>
     </div>
   );

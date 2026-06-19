@@ -1,27 +1,26 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabase';
 import LangSwitcher from '../components/LangSwitcher';
 import './Login.css';
 
 export default function Login() {
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [loggedIn, setLoggedIn] = useState(false);
   const { signIn, userRole } = useAuth();
   const { t } = useLanguage();
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (loggedIn && userRole !== null) {
+    if (userRole) {
       if (userRole === 'admin') navigate('/admin');
       else navigate('/dashboard');
     }
-  }, [loggedIn, userRole, navigate]);
+  }, [userRole, navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -29,45 +28,33 @@ export default function Login() {
     setLoading(true);
 
     try {
-      // Try to sign in
-      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-        email: email,
-        password: password
-      });
+      // Find user by username
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('username', username)
+        .single();
 
-      if (authError) {
-        setError('Email not found or password incorrect');
+      if (userError || !userData) {
+        setError('Username not found');
         setLoading(false);
         return;
       }
 
-      if (authData?.user) {
-        // Check if email is confirmed
-        if (!authData.user.email_confirmed_at) {
-          setError('Please confirm your email first. Check your inbox.');
-          await supabase.auth.signOut();
-          setLoading(false);
-          return;
-        }
+      // Check password (simple comparison - use bcrypt in production!)
+      if (userData.password !== password) {
+        setError('Password incorrect');
+        setLoading(false);
+        return;
+      }
 
-        // Check user status in database
-        const { data: userRecord } = await supabase
-          .from('users')
-          .select('status')
-          .eq('id', authData.user.id)
-          .single();
-
-        // If pending, show waiting page
-        if (userRecord?.status === 'pending') {
-          await supabase.auth.signOut();
-          navigate('/waiting-approval', { state: { email: email } });
-          setLoading(false);
-          return;
-        }
-
-        // If approved, continue
-        await signIn(email, password);
-        setLoggedIn(true);
+      // Create session manually
+      await signIn(userData.email || username, password);
+      
+      if (userData.role === 'admin') {
+        navigate('/admin');
+      } else {
+        navigate('/dashboard');
       }
     } catch (error) {
       setError(error.message);
@@ -80,27 +67,36 @@ export default function Login() {
       <div className="login-card">
         <div className="login-lang"><LangSwitcher /></div>
         <h1>QR Menu</h1>
-        <h2>{t.restaurantLogin}</h2>
+        <h2>Restaurant Login</h2>
         {error && <div className="error-message">{error}</div>}
         <form onSubmit={handleSubmit}>
           <div className="form-group">
-            <label>{t.email}</label>
-            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+            <label>Username *</label>
+            <input 
+              type="text" 
+              value={username} 
+              onChange={(e) => setUsername(e.target.value)} 
+              required 
+              placeholder="Enter your username"
+            />
           </div>
           <div className="form-group">
-            <label>{t.password}</label>
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+            <label>Password *</label>
+            <input 
+              type="password" 
+              value={password} 
+              onChange={(e) => setPassword(e.target.value)} 
+              required 
+              placeholder="Enter your password"
+            />
           </div>
           <button type="submit" className="login-btn" disabled={loading}>
-            {loading ? t.loggingIn : t.loginBtn}
+            {loading ? 'Logging In...' : 'Login'}
           </button>
         </form>
 
         <p className="signup-link">
-          New restaurant? <Link to="/signup">Request access here</Link>
-        </p>
-        <p className="forgot-link">
-          <Link to="/forgot-password">Forgot password?</Link>
+          Need an account? Contact admin to create one
         </p>
       </div>
     </div>

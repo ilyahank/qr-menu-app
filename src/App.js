@@ -5,24 +5,17 @@ import { LanguageProvider } from './contexts/LanguageContext';
 import PrivateRoute from './components/PrivateRoute';
 import AdminRoute from './components/AdminRoute';
 
-// Public Pages
+// Pages
 import PublicMenu from './pages/PublicMenu';
 import Login from './pages/Login';
-import Signup from './pages/Signup';
-import ForgotPassword from './pages/ForgotPassword';
-import WaitingApproval from './pages/WaitingApproval';
+import AdminPanel from './pages/AdminPanel';
 import AdminApprovals from './pages/AdminApprovals';
-
-// Owner Dashboard
+import AdminRestaurantEditor from './pages/AdminRestaurantEditor';
 import Dashboard from './pages/Dashboard';
 import MenuManagement from './pages/MenuManagement';
 import CategoriesManagement from './pages/CategoriesManagement';
 import Settings from './pages/Settings';
 import QRCodePage from './pages/QRCodePage';
-
-// Admin Panel
-import AdminPanel from './pages/AdminPanel';
-import AdminRestaurantEditor from './pages/AdminRestaurantEditor';
 
 import './App.css';
 
@@ -35,9 +28,6 @@ function App() {
             {/* Public Routes */}
             <Route path="/r/:restaurantId" element={<PublicMenu />} />
             <Route path="/login" element={<Login />} />
-            <Route path="/signup" element={<Signup />} />
-            <Route path="/forgot-password" element={<ForgotPassword />} />
-            <Route path="/waiting-approval" element={<WaitingApproval />} />
             
             {/* Owner Routes */}
             <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
@@ -48,8 +38,8 @@ function App() {
             
             {/* Admin Routes */}
             <Route path="/admin" element={<AdminRoute><AdminPanel /></AdminRoute>} />
-            <Route path="/admin/restaurant/:restaurantId" element={<AdminRoute><AdminRestaurantEditor /></AdminRoute>} />
             <Route path="/admin/approvals" element={<AdminRoute><AdminApprovals /></AdminRoute>} />
+            <Route path="/admin/restaurant/:restaurantId" element={<AdminRoute><AdminRestaurantEditor /></AdminRoute>} />
             
             {/* Default redirect */}
             <Route path="/" element={<Navigate to="/login" />} />
