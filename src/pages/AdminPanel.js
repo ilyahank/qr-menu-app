@@ -8,7 +8,7 @@ import './AdminPanel.css';
 
 export default function AdminPanel() {
   const { userRole, signOut } = useAuth();
-  const { t } = useLanguage();
+  useLanguage(); // Language context loaded
   const navigate = useNavigate();
   const [restaurants, setRestaurants] = useState([]);
   const [showForm, setShowForm] = useState(false);
@@ -81,7 +81,7 @@ export default function AdminPanel() {
       if (restaurantError) throw restaurantError;
 
       // Create user with username and password
-      const { data: userData, error: userError } = await supabase
+      const { error: userError } = await supabase
         .from('users')
         .insert([{
           username: formData.username,

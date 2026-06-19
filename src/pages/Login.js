@@ -12,7 +12,7 @@ export default function Login() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { signIn, userRole } = useAuth();
-  const { t } = useLanguage();
+  useLanguage(); // Language context loaded
   const navigate = useNavigate();
 
   useEffect(() => {
