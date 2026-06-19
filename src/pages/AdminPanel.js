@@ -28,13 +28,31 @@ export default function AdminPanel() {
 
   const fetchRestaurants = async () => {
     try {
-      const { data: restaurantsData, error } = await supabase
+      // 1. Fetch all restaurants
+      const { data: restaurantsData, error: restError } = await supabase
         .from('restaurants')
-        .select('*, users (username, email, role)')
+        .select('*')
         .order('created_at', { ascending: false });
       
-      if (error) throw error;
-      setRestaurants(restaurantsData || []);
+      if (restError) throw restError;
+
+      // 2. Fetch all users who are owners or associated with restaurants
+      const { data: usersData, error: usersError } = await supabase
+        .from('users')
+        .select('restaurant_id, username, email, role');
+      
+      if (usersError) throw usersError;
+
+      // 3. Map users to restaurants in memory (client-side join)
+      const mappedRestaurants = (restaurantsData || []).map(r => {
+        const matchingUsers = (usersData || []).filter(u => u.restaurant_id === r.id);
+        return {
+          ...r,
+          users: matchingUsers
+        };
+      });
+
+      setRestaurants(mappedRestaurants);
     } catch (error) { 
       console.error(error); 
     }
@@ -141,20 +159,24 @@ export default function AdminPanel() {
         const emails = usersToDelete?.map(u => u.email).filter(Boolean) || [];
 
         // Delete menu items first
-        await supabase.from('menu_items').delete().eq('restaurant_id', restaurantId);
+        const { error: menuError } = await supabase.from('menu_items').delete().eq('restaurant_id', restaurantId);
+        if (menuError) throw new Error('Failed to delete menu items: ' + menuError.message);
         
         // Delete categories
-        await supabase.from('categories').delete().eq('restaurant_id', restaurantId);
+        const { error: catError } = await supabase.from('categories').delete().eq('restaurant_id', restaurantId);
+        if (catError) throw new Error('Failed to delete categories: ' + catError.message);
         
         // Delete users
-        await supabase.from('users').delete().eq('restaurant_id', restaurantId);
+        const { error: userDelError } = await supabase.from('users').delete().eq('restaurant_id', restaurantId);
+        if (userDelError) throw new Error('Failed to delete owner users: ' + userDelError.message);
 
         // Delete subscription requests matching those emails
         if (emails.length > 0) {
-          await supabase
+          const { error: subError } = await supabase
             .from('subscription_requests')
             .delete()
             .in('email', emails);
+          if (subError) throw new Error('Failed to delete subscription requests: ' + subError.message);
         }
         
         // Finally delete restaurant
@@ -163,11 +185,7 @@ export default function AdminPanel() {
           .delete()
           .eq('id', restaurantId);
 
-        if (deleteError) {
-          alert('❌ Delete failed: ' + deleteError.message);
-          setLoading(false);
-          return;
-        }
+        if (deleteError) throw new Error('Failed to delete restaurant: ' + deleteError.message);
 
         // Update state immediately
         setRestaurants(prev => prev.filter(r => r.id !== restaurantId));
