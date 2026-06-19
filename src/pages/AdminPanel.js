@@ -58,7 +58,7 @@ export default function AdminPanel() {
 
       if (authData?.user?.id) {
         await supabase.from('users').insert([{
-          id: authData.user.id, email: formData.email, restaurant_id: restaurantData.id, role: 'owner', created_at: new Date()
+          id: authData.user.id, email: formData.email, restaurant_id: restaurantData.id, role: 'owner', status: 'approved', created_at: new Date()
         }]);
       }
 
@@ -98,7 +98,6 @@ export default function AdminPanel() {
         <div className="nav-brand"><h2>{t.adminPanel}</h2></div>
         <div className="nav-links">
           <LangSwitcher />
-          <Link to="/admin/approvals" className="nav-link">Approvals</Link>
           <Link to="/admin/approvals" className="nav-link">Approvals</Link>
           <button onClick={signOut} className="logout-btn">{t.logout}</button>
         </div>
@@ -175,6 +174,7 @@ export default function AdminPanel() {
                   </td>
                   <td>
                     <div className="action-buttons">
+                      <Link to={`/admin/restaurant/${restaurant.id}`} className="edit-restaurant-btn">Edit Menu</Link>
                       <button onClick={() => deleteRestaurant(restaurant.id)} className="delete-btn">{t.delete}</button>
                     </div>
                   </td>
