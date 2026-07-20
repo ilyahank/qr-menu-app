@@ -12,7 +12,7 @@ export default function Settings() {
   const [restaurant, setRestaurant] = useState(null);
   const [formData, setFormData] = useState({
     name: '', tagline: '', color: '#667eea', logo: null,
-    facebook: '', instagram: '', whatsapp: '', email_contact: ''
+    facebook: '', instagram: '', phone: '', email_contact: ''
   });
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
@@ -32,7 +32,7 @@ export default function Settings() {
             logo: null,
             facebook: restaurantData.facebook || '',
             instagram: restaurantData.instagram || '',
-            whatsapp: restaurantData.whatsapp || '',
+            phone: restaurantData.phone || '',
             email_contact: restaurantData.email_contact || ''
           });
         }
@@ -66,7 +66,7 @@ export default function Settings() {
       const { error } = await supabase.from('restaurants').update({
         name: formData.name, tagline: formData.tagline, color: formData.color,
         logo: logoUrl, facebook: formData.facebook, instagram: formData.instagram,
-        whatsapp: formData.whatsapp, email_contact: formData.email_contact, updated_at: new Date()
+        phone: formData.phone, email_contact: formData.email_contact, updated_at: new Date()
       }).eq('id', restaurant.id);
       if (error) throw error;
       setMessage(t.settingsUpdated);
@@ -106,7 +106,7 @@ export default function Settings() {
               <div className="preview-social">
                 {formData.facebook && <span className="prev-fb"><i className="fab fa-facebook-f"></i></span>}
                 {formData.instagram && <span className="prev-ig"><i className="fab fa-instagram"></i></span>}
-                {formData.whatsapp && <span className="prev-wa"><i className="fab fa-whatsapp"></i></span>}
+                {formData.phone && <span className="prev-phone"><i className="fas fa-phone"></i></span>}
                 {formData.email_contact && <span className="prev-em"><i className="fas fa-envelope"></i></span>}
               </div>
             </div>
@@ -142,9 +142,9 @@ export default function Settings() {
                 <input type="url" name="instagram" value={formData.instagram} onChange={handleInputChange} placeholder="https://instagram.com/yourpage" />
               </div>
               <div className="form-group">
-                <label><i className="fab fa-whatsapp"></i> {t.whatsappNumber}</label>
-                <input type="text" name="whatsapp" value={formData.whatsapp} onChange={handleInputChange} />
-                <small>{t.whatsappHint}</small>
+                <label><i className="fas fa-phone"></i> Phone Number</label>
+                <input type="tel" name="phone" value={formData.phone} onChange={handleInputChange} placeholder="+1234567890" />
+                <small>Customers can call directly from the menu</small>
               </div>
               <div className="form-group">
                 <label><i className="fas fa-envelope"></i> {t.contactEmail}</label>

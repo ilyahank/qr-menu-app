@@ -60,7 +60,13 @@ export default function PublicMenu() {
 
   const copyEmail = () => {
     navigator.clipboard.writeText(restaurant.email_contact);
-    alert(t.emailCopied + restaurant.email_contact);
+    alert('Email copied: ' + restaurant.email_contact);
+  };
+
+  const callPhone = () => {
+    if (restaurant.phone) {
+      window.location.href = `tel:${restaurant.phone}`;
+    }
   };
 
   return (
@@ -78,7 +84,7 @@ export default function PublicMenu() {
 
       {visibleCategories.length > 0 && (
         <div className="category-filters">
-          <button className={`filter-btn ${activeCategory === 'all' ? 'active' : ''}`} onClick={() => setActiveCategory('all')}>{t.all}</button>
+          <button className={`filter-btn ${activeCategory === 'all' ? 'active' : ''}`} onClick={() => setActiveCategory('all')}>All</button>
           {visibleCategories.map(cat => (
             <button key={cat.id} className={`filter-btn ${activeCategory === cat.id ? 'active' : ''}`} onClick={() => setActiveCategory(cat.id)}>
               {cat.icon} {cat.name}
@@ -115,7 +121,7 @@ export default function PublicMenu() {
       </div>
 
       <footer className="menu-footer">
-        {(restaurant.facebook || restaurant.instagram || restaurant.whatsapp || restaurant.email_contact) && (
+        {(restaurant.facebook || restaurant.instagram || restaurant.phone || restaurant.email_contact) && (
           <div className="social-links">
             {restaurant.facebook && (
               <a href={restaurant.facebook} target="_blank" rel="noreferrer" className="social-btn facebook">
@@ -127,13 +133,13 @@ export default function PublicMenu() {
                 <i className="fab fa-instagram"></i>
               </a>
             )}
-            {restaurant.whatsapp && (
-              <a href={`https://wa.me/${restaurant.whatsapp}`} target="_blank" rel="noreferrer" className="social-btn whatsapp">
-                <i className="fab fa-whatsapp"></i>
-              </a>
+            {restaurant.phone && (
+              <button onClick={callPhone} className="social-btn phone" title="Call us">
+                <i className="fas fa-phone"></i>
+              </button>
             )}
             {restaurant.email_contact && (
-              <button onClick={copyEmail} className="social-btn email">
+              <button onClick={copyEmail} className="social-btn email" title="Copy email">
                 <i className="fas fa-envelope"></i>
               </button>
             )}
