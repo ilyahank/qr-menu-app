@@ -96,7 +96,7 @@ export default function Dashboard() {
 
         // If today is after the 7th of the month, we auto-archive in the background
         if (today.getDate() > 7) {
-          triggerAutoArchive(userDataRestaurantId || restaurantId, uYear, uMonth);
+          triggerAutoArchive(restaurantId, uYear, uMonth);
         } else {
           // If within first 7 days, show blocking manual archive modal
           setIsArchiveBlocked(true);
