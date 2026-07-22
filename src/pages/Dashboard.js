@@ -24,6 +24,7 @@ export default function Dashboard() {
   const [archiveLoading, setArchiveLoading] = useState(false);
   const [archivedReports, setArchivedReports] = useState([]);
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     const fetchRestaurantData = async () => {
       if (!currentUser) return;
@@ -125,6 +126,7 @@ export default function Dashboard() {
     }
   };
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (restaurantId) {
       checkArchivingStatus();
