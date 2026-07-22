@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { supabase } from '../supabase';
@@ -66,7 +66,7 @@ export default function Dashboard() {
     fetchRestaurantData();
   }, [currentUser]);
 
-  const checkArchivingStatus = async () => {
+  const checkArchivingStatus = useCallback(async () => {
     if (!restaurantId) return;
 
     try {
@@ -108,9 +108,8 @@ export default function Dashboard() {
     } catch (e) {
       console.error('Error checking archiving status:', e);
     }
-  };
-
-  const fetchArchivedReports = async () => {
+  }, [restaurantId]);
+  const fetchArchivedReports = useCallback(async () => {
     if (!restaurantId) return;
     try {
       const { data, error } = await supabase
@@ -124,7 +123,7 @@ export default function Dashboard() {
     } catch (e) {
       console.error(e);
     }
-  };
+  }, [restaurantId]);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
@@ -132,7 +131,7 @@ export default function Dashboard() {
       checkArchivingStatus();
       fetchArchivedReports();
     }
-  }, [restaurantId]);
+  }, [restaurantId, checkArchivingStatus, fetchArchivedReports]);
 
   const triggerAutoArchive = async (rId, yr, mth) => {
     try {
