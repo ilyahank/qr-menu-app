@@ -1,0 +1,200 @@
+.orders-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 20px;
+  margin-top: 25px;
+}
+
+.order-card {
+  background: white;
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  border: 1px solid #f0f0f0;
+  transition: all 0.3s;
+}
+
+.order-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.08);
+}
+
+/* Card border accents based on status */
+.order-card.status-pending { border-top: 6px solid #e11d48; }
+.order-card.status-confirmed { border-top: 6px solid #4f46e5; }
+.order-card.status-completed { border-top: 6px solid #10b981; }
+.order-card.status-cancelled { border-top: 6px solid #9ca3af; }
+
+.order-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.table-badge {
+  background: #f3f4f6;
+  color: #374151;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.order-status-label {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 12px;
+}
+
+.order-status-label.pending { background: #fee2e2; color: #ef4444; }
+.order-status-label.confirmed { background: #e0e7ff; color: #4f46e5; }
+.order-status-label.completed { background: #d1fae5; color: #059669; }
+.order-status-label.cancelled { background: #f3f4f6; color: #6b7280; }
+
+.order-items-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 15px;
+  flex: 1;
+}
+
+.order-item-line {
+  display: flex;
+  justify-content: space-between;
+  font-size: 14px;
+  color: #4b5563;
+}
+
+.order-item-line strong {
+  color: #111827;
+  margin-right: 5px;
+}
+
+.order-notes-box {
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  padding: 10px 14px;
+  border-radius: 8px;
+  margin-bottom: 15px;
+  font-size: 12px;
+}
+
+.order-notes-box p {
+  margin: 4px 0 0 0;
+  color: #d97706;
+  font-weight: bold;
+}
+
+.order-card-footer {
+  border-top: 1px solid #f3f4f6;
+  padding-top: 12px;
+  margin-bottom: 15px;
+}
+
+.order-total-price {
+  display: flex;
+  justify-content: space-between;
+  font-size: 15px;
+  color: #374151;
+}
+
+.order-total-price strong {
+  font-size: 18px;
+  color: #111827;
+}
+
+.order-actions-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.action-btn {
+  width: 100%;
+  padding: 10px;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.action-btn:hover {
+  opacity: 0.9;
+}
+
+.confirm-btn { background: #4f46e5; color: white; }
+.complete-btn { background: #10b981; color: white; }
+.cancel-btn { background: #f3f4f6; color: #4b5563; }
+
+.print-btn {
+  flex: 1;
+  padding: 8px;
+  border: none;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
+
+.print-btn.customer { background: #eef2ff; color: #4f46e5; border: 1px solid #c7d2fe; }
+.print-btn.kitchen { background: #fef2f2; color: #ef4444; border: 1px solid #fecaca; }
+
+.print-btn:hover {
+  transform: translateY(-1px);
+}
+
+.no-orders-message {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 50px 20px;
+  color: #999;
+  background: white;
+  border-radius: 16px;
+}
+
+/* HIDDEN PRINT SECTION FOR THREAT PRINTING */
+#thermal-print-section {
+  display: none;
+}
+
+/* @media print QUERY FOR BROWSER PRINTING */
+@media print {
+  /* Hide all elements on page */
+  body * {
+    visibility: hidden;
+  }
+  /* Show only the receipt container and its contents */
+  #thermal-print-section, #thermal-print-section * {
+    visibility: visible;
+  }
+  
+  /* Format printing container size & style */
+  #thermal-print-section {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 58mm; /* standard size, browser scales automatically */
+    background: white;
+    box-shadow: none;
+    margin: 0;
+    padding: 0;
+  }
+  
+  /* Reset margins for printers */
+  @page {
+    margin: 0;
+  }
+}

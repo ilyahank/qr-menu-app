@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { useLanguage } from '../contexts/LanguageContext';
 import { supabase } from '../supabase';
 import { useNavigate, Link } from 'react-router-dom';
 import LangSwitcher from '../components/LangSwitcher';
@@ -17,20 +18,40 @@ const generateUUID = () => {
 };
 
 export default function AdminPanel() {
-  const { userRole, signOut, impersonate } = useAuth();
+  const { userRole, signOut, impersonate, currentUser } = useAuth();
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const [restaurants, setRestaurants] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [filterSubStatus, setFilterSubStatus] = useState('all'); // all, active, expiring_soon, expired
+  const [sortByDays, setSortByDays] = useState(null); // null, 'asc', 'desc'
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({ 
     name: '', 
     username: '', 
     password: '', 
     tagline: '', 
-    color: '#667eea' 
+    color: '#667eea',
+    sub_start_date: new Date().toISOString().split('T')[0],
+    sub_duration: '30' // 30, 90, 365, custom
   });
+  const [customDays, setCustomDays] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
+
+  // Subscription Extension Modal State
+  const [showExtendModal, setShowExtendModal] = useState(false);
+  const [selectedRestForSub, setSelectedRestForSub] = useState(null);
+  const [extendDuration, setExtendDuration] = useState('30'); // 30, 90, 365, custom
+  const [extendCustomDays, setExtendCustomDays] = useState('');
+  const [extendNotes, setExtendNotes] = useState('');
+
+  // Subscription History Modal State
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [historyList, setHistoryList] = useState([]);
+  const [historyRestName, setHistoryRestName] = useState('');
+
+  // Owner Account Modal State
   const [showCreateOwner, setShowCreateOwner] = useState(false);
   const [selectedRestForOwner, setSelectedRestForOwner] = useState(null);
   const [ownerForm, setOwnerForm] = useState({ username: '', password: '' });
@@ -42,6 +63,7 @@ export default function AdminPanel() {
 
   const fetchRestaurants = async () => {
     try {
+      setLoading(true);
       // 1. Fetch all restaurants
       const { data: restaurantsData, error: restError } = await supabase
         .from('restaurants')
@@ -50,25 +72,57 @@ export default function AdminPanel() {
       
       if (restError) throw restError;
 
-      // 2. Fetch all users who are owners or associated with restaurants
+      // 2. Fetch all users who are owners
       const { data: usersData, error: usersError } = await supabase
         .from('users')
-        .select('restaurant_id, username, email, role');
+        .select('id, restaurant_id, username, email, role');
       
       if (usersError) throw usersError;
 
-      // 3. Map users to restaurants in memory (client-side join)
+      // 3. Fetch all subscriptions
+      const { data: subsData, error: subsError } = await supabase
+        .from('subscriptions')
+        .select('*');
+      
+      if (subsError) throw subsError;
+
+      // 4. Map users and subscriptions to restaurants in memory
       const mappedRestaurants = (restaurantsData || []).map(r => {
         const matchingUsers = (usersData || []).filter(u => u.restaurant_id === r.id);
+        const sub = (subsData || []).find(s => s.restaurant_id === r.id);
+
+        let daysLeft = null;
+        let subStatus = 'none';
+        
+        if (sub) {
+          const end = new Date(sub.end_date);
+          const today = new Date();
+          // Reset time part to accurately calculate remaining days
+          end.setHours(23, 59, 59, 999);
+          today.setHours(0, 0, 0, 0);
+          const diffTime = end - today;
+          daysLeft = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+          subStatus = daysLeft <= 0 ? 'expired' : (daysLeft <= 7 ? 'expiring_soon' : 'active');
+        } else {
+          // Default to expired/none if no record exists
+          daysLeft = 0;
+          subStatus = 'expired';
+        }
+
         return {
           ...r,
-          users: matchingUsers
+          users: matchingUsers,
+          subscription: sub,
+          daysLeft,
+          subStatus
         };
       });
 
       setRestaurants(mappedRestaurants);
     } catch (error) { 
-      console.error(error); 
+      console.error('Error fetching restaurants:', error); 
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -85,7 +139,7 @@ export default function AdminPanel() {
     try {
       const normalizedUsername = formData.username.trim().toLowerCase();
 
-      // Check if username already exists (case-insensitive)
+      // Check if username already exists
       const { data: existingUser } = await supabase
         .from('users')
         .select('id')
@@ -95,6 +149,17 @@ export default function AdminPanel() {
         setMessage('❌ Error: Username already exists! Choose a different one.');
         setLoading(false);
         return;
+      }
+
+      // Calculate subscription duration
+      let durationDays = parseInt(formData.sub_duration);
+      if (formData.sub_duration === 'custom') {
+        durationDays = parseInt(customDays);
+        if (isNaN(durationDays) || durationDays <= 0) {
+          setMessage('❌ Error: Please enter a valid number of days for custom duration.');
+          setLoading(false);
+          return;
+        }
       }
 
       // Create restaurant
@@ -113,9 +178,8 @@ export default function AdminPanel() {
 
       if (restaurantError) throw restaurantError;
 
-      // Create user with ID
+      // Create owner user
       const userId = generateUUID();
-      
       const { error: userError } = await supabase
         .from('users')
         .insert([{
@@ -131,16 +195,193 @@ export default function AdminPanel() {
 
       if (userError) throw userError;
 
+      // Calculate end date based on start date and duration days
+      const startDateObj = new Date(formData.sub_start_date);
+      const endDateObj = new Date(startDateObj);
+      endDateObj.setDate(startDateObj.getDate() + durationDays);
+      endDateObj.setHours(23, 59, 59, 999);
+
+      // Create subscription record
+      const { error: subError } = await supabase
+        .from('subscriptions')
+        .insert([{
+          restaurant_id: restaurantData.id,
+          start_date: startDateObj,
+          end_date: endDateObj,
+          status: durationDays > 7 ? 'active' : 'expiring_soon'
+        }]);
+
+      if (subError) throw subError;
+
+      // Log subscription in history
+      await supabase
+        .from('subscription_history')
+        .insert([{
+          restaurant_id: restaurantData.id,
+          extended_by: currentUser?.id || null,
+          action_type: 'create',
+          old_end_date: null,
+          new_end_date: endDateObj,
+          duration_days: durationDays,
+          notes: 'Initial creation'
+        }]);
+
       // Refresh list immediately
       await fetchRestaurants();
-      setFormData({ name: '', username: '', password: '', tagline: '', color: '#667eea' });
+      setFormData({ 
+        name: '', 
+        username: '', 
+        password: '', 
+        tagline: '', 
+        color: '#667eea',
+        sub_start_date: new Date().toISOString().split('T')[0],
+        sub_duration: '30'
+      });
+      setCustomDays('');
       setShowForm(false);
       setMessage('✅ Restaurant created successfully!');
       setTimeout(() => setMessage(''), 5000);
     } catch (error) { 
       setMessage('❌ Error: ' + error.message); 
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
+  };
+
+  const handleExtendSubscription = async (e) => {
+    e.preventDefault();
+    if (!selectedRestForSub) return;
+    setLoading(true);
+
+    try {
+      let durationDays = parseInt(extendDuration);
+      if (extendDuration === 'custom') {
+        durationDays = parseInt(extendCustomDays);
+        if (isNaN(durationDays) || durationDays <= 0) {
+          alert('Please enter a valid number of days');
+          setLoading(false);
+          return;
+        }
+      }
+
+      // Check current subscription end date
+      const { data: subData } = await supabase
+        .from('subscriptions')
+        .select('*')
+        .eq('restaurant_id', selectedRestForSub.id)
+        .single();
+
+      let currentEndDate = null;
+      let newEndDate = new Date();
+
+      if (subData) {
+        currentEndDate = new Date(subData.end_date);
+        const today = new Date();
+        
+        if (currentEndDate > today) {
+          // Active: extend from the old end date
+          newEndDate = new Date(currentEndDate);
+          newEndDate.setDate(newEndDate.getDate() + durationDays);
+        } else {
+          // Expired: extend from today
+          newEndDate.setDate(newEndDate.getDate() + durationDays);
+        }
+      } else {
+        // No sub record: extend from today
+        newEndDate.setDate(newEndDate.getDate() + durationDays);
+      }
+
+      newEndDate.setHours(23, 59, 59, 999);
+
+      // Determine new status
+      const today = new Date();
+      const diffTime = newEndDate - today;
+      const days = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      const status = days <= 0 ? 'expired' : (days <= 7 ? 'expiring_soon' : 'active');
+
+      if (subData) {
+        // Update subscription
+        const { error } = await supabase
+          .from('subscriptions')
+          .update({
+            end_date: newEndDate,
+            status: status,
+            updated_at: new Date()
+          })
+          .eq('restaurant_id', selectedRestForSub.id);
+
+        if (error) throw error;
+      } else {
+        // Insert subscription
+        const { error } = await supabase
+          .from('subscriptions')
+          .insert([{
+            restaurant_id: selectedRestForSub.id,
+            start_date: new Date(),
+            end_date: newEndDate,
+            status: status
+          }]);
+
+        if (error) throw error;
+      }
+
+      // Log to history
+      const { error: histError } = await supabase
+        .from('subscription_history')
+        .insert([{
+          restaurant_id: selectedRestForSub.id,
+          extended_by: currentUser?.id || null,
+          action_type: 'extend',
+          old_end_date: currentEndDate,
+          new_end_date: newEndDate,
+          duration_days: durationDays,
+          notes: extendNotes || 'Manual extension'
+        }]);
+
+      if (histError) throw histError;
+
+      alert('✅ Subscription extended successfully!');
+      setShowExtendModal(false);
+      setSelectedRestForSub(null);
+      setExtendDuration('30');
+      setExtendCustomDays('');
+      setExtendNotes('');
+      await fetchRestaurants();
+    } catch (error) {
+      alert('❌ Error extending subscription: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleShowHistory = async (restaurant) => {
+    try {
+      setLoading(true);
+      setHistoryRestName(restaurant.name);
+      
+      const { data, error } = await supabase
+        .from('subscription_history')
+        .select(`
+          id,
+          action_type,
+          old_end_date,
+          new_end_date,
+          duration_days,
+          notes,
+          created_at,
+          users (username)
+        `)
+        .eq('restaurant_id', restaurant.id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setHistoryList(data || []);
+      setShowHistoryModal(true);
+    } catch (error) {
+      alert('Error fetching history: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const toggleActive = async (restaurantId, currentStatus) => {
@@ -160,10 +401,10 @@ export default function AdminPanel() {
   };
 
   const deleteRestaurant = async (restaurantId) => {
-    if (window.confirm('⚠️ Delete this restaurant and ALL its data? This CANNOT be undone!')) {
+    if (window.confirm(t.confirmDelete)) {
       try {
         setLoading(true);
-        // Get emails of the users of this restaurant first
+        // Get emails of the users
         const { data: usersToDelete, error: fetchUsersError } = await supabase
           .from('users')
           .select('email')
@@ -172,25 +413,24 @@ export default function AdminPanel() {
         if (fetchUsersError) throw fetchUsersError;
         const emails = usersToDelete?.map(u => u.email).filter(Boolean) || [];
 
-        // Delete menu items first
-        const { error: menuError } = await supabase.from('menu_items').delete().eq('restaurant_id', restaurantId);
-        if (menuError) throw new Error('Failed to delete menu items: ' + menuError.message);
+        // Delete menu items
+        await supabase.from('menu_items').delete().eq('restaurant_id', restaurantId);
         
         // Delete categories
-        const { error: catError } = await supabase.from('categories').delete().eq('restaurant_id', restaurantId);
-        if (catError) throw new Error('Failed to delete categories: ' + catError.message);
+        await supabase.from('categories').delete().eq('restaurant_id', restaurantId);
         
         // Delete users
-        const { error: userDelError } = await supabase.from('users').delete().eq('restaurant_id', restaurantId);
-        if (userDelError) throw new Error('Failed to delete owner users: ' + userDelError.message);
+        await supabase.from('users').delete().eq('restaurant_id', restaurantId);
+
+        // Delete subscription history & subscription record
+        await supabase.from('subscription_history').delete().eq('restaurant_id', restaurantId);
+        await supabase.from('subscriptions').delete().eq('restaurant_id', restaurantId);
+        await supabase.from('daily_sales_summary').delete().eq('restaurant_id', restaurantId);
+        await supabase.from('monthly_totals').delete().eq('restaurant_id', restaurantId);
 
         // Delete subscription requests matching those emails
         if (emails.length > 0) {
-          const { error: subError } = await supabase
-            .from('subscription_requests')
-            .delete()
-            .in('email', emails);
-          if (subError) throw new Error('Failed to delete subscription requests: ' + subError.message);
+          await supabase.from('subscription_requests').delete().in('email', emails);
         }
         
         // Finally delete restaurant
@@ -199,14 +439,10 @@ export default function AdminPanel() {
           .delete()
           .eq('id', restaurantId);
 
-        if (deleteError) throw new Error('Failed to delete restaurant: ' + deleteError.message);
+        if (deleteError) throw deleteError;
 
-        // Update state immediately
         setRestaurants(prev => prev.filter(r => r.id !== restaurantId));
         alert('✅ Restaurant deleted successfully!');
-        
-        // Refresh to be sure
-        setTimeout(() => fetchRestaurants(), 1000);
       } catch (error) { 
         alert('❌ Error: ' + error.message); 
       } finally {
@@ -218,7 +454,6 @@ export default function AdminPanel() {
   const handleImpersonate = async (restaurantId) => {
     try {
       setLoading(true);
-      // Fetch owner of this restaurant
       const { data: ownerData, error } = await supabase
         .from('users')
         .select('*')
@@ -231,13 +466,12 @@ export default function AdminPanel() {
 
       if (!ownerData) {
         const restaurantObj = restaurants.find(r => r.id === restaurantId);
-        if (window.confirm(`❌ Error: No owner user found for ${restaurantObj?.name || 'this restaurant'}. Would you like to create one now?`)) {
+        if (window.confirm(`❌ Error: No owner user found. Create one now?`)) {
           handleOpenCreateOwner(restaurantObj);
         }
         return;
       }
 
-      // Impersonate owner
       await impersonate(ownerData);
       navigate('/dashboard');
     } catch (error) {
@@ -264,14 +498,13 @@ export default function AdminPanel() {
     try {
       const normalizedUsername = ownerForm.username.trim().toLowerCase();
 
-      // Check if username already exists
       const { data: existingUser } = await supabase
         .from('users')
         .select('id')
         .ilike('username', normalizedUsername);
 
       if (existingUser && existingUser.length > 0) {
-        alert('❌ Error: Username already exists! Choose a different one.');
+        alert('❌ Error: Username already exists!');
         setLoading(false);
         return;
       }
@@ -294,7 +527,6 @@ export default function AdminPanel() {
 
       alert('✅ Owner account created successfully!');
       setShowCreateOwner(false);
-      setOwnerForm({ username: '', password: '' });
       await fetchRestaurants();
     } catch (error) {
       alert('❌ Error: ' + error.message);
@@ -303,106 +535,300 @@ export default function AdminPanel() {
     }
   };
 
+  // Filter and sort restaurants
   const filteredRestaurants = restaurants.filter(r => {
-    if (!searchTerm.trim()) return true;
-    const term = searchTerm.toLowerCase();
-    const matchesName = r.name?.toLowerCase().includes(term);
-    const matchesUsername = r.users?.some(u => u.username?.toLowerCase().includes(term));
-    const matchesEmail = r.users?.some(u => u.email?.toLowerCase().includes(term));
-    return matchesName || matchesUsername || matchesEmail;
+    // 1. Text Search
+    let matchesSearch = true;
+    if (searchTerm.trim()) {
+      const term = searchTerm.toLowerCase();
+      const matchesName = r.name?.toLowerCase().includes(term);
+      const matchesUsername = r.users?.some(u => u.username?.toLowerCase().includes(term));
+      const matchesEmail = r.users?.some(u => u.email?.toLowerCase().includes(term));
+      matchesSearch = matchesName || matchesUsername || matchesEmail;
+    }
+
+    // 2. Subscription Status Filter
+    let matchesSubFilter = true;
+    if (filterSubStatus !== 'all') {
+      matchesSubFilter = r.subStatus === filterSubStatus;
+    }
+
+    return matchesSearch && matchesSubFilter;
   });
 
-  if (userRole !== 'admin') return <div>Loading...</div>;
+  // Sort
+  if (sortByDays !== null) {
+    filteredRestaurants.sort((a, b) => {
+      const daysA = a.daysLeft === null ? -9999 : a.daysLeft;
+      const daysB = b.daysLeft === null ? -9999 : b.daysLeft;
+      if (sortByDays === 'asc') return daysA - daysB;
+      return daysB - daysA;
+    });
+  }
+
+  const toggleSort = () => {
+    if (sortByDays === null) setSortByDays('asc');
+    else if (sortByDays === 'asc') setSortByDays('desc');
+    else setSortByDays(null);
+  };
+
+  if (userRole !== 'admin') return <div style={{ padding: '50px', textAlign: 'center' }}>Loading...</div>;
 
   return (
-    <div className="admin-panel">
-      <nav className="admin-nav">
-        <div className="nav-brand"><h2>Admin Panel</h2></div>
-        <div className="nav-links">
+    <div className="admin-panel" style={{ direction: 'rtl', textAlign: 'right' }}>
+      <nav className="admin-nav" style={{ padding: '15px 30px' }}>
+        <div className="nav-brand"><h2 style={{ margin: 0 }}>لوحة الإدارة QR Menu</h2></div>
+        <div className="nav-links" style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
           <LangSwitcher />
-          <Link to="/admin/approvals" className="nav-link">View Requests</Link>
-          <button onClick={signOut} className="logout-btn">Logout</button>
+          <Link to="/admin/approvals" className="nav-link" style={{ color: 'white', textDecoration: 'none', fontWeight: '500' }}>طلبات التسجيل</Link>
+          <button onClick={signOut} className="logout-btn">{t.logout}</button>
         </div>
       </nav>
 
       <div className="admin-content">
-        <div className="admin-header">
-          <h1>Restaurant Management</h1>
-          <div className="admin-controls">
+        <div className="admin-header" style={{ display: 'flex', flexDirection: 'column', gap: '20px', alignItems: 'stretch' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h1>{t.restaurantManagement}</h1>
+            <button onClick={() => setShowForm(true)} className="add-btn">{t.newRestaurant}</button>
+          </div>
+          
+          <div className="admin-filters-bar" style={{ display: 'flex', gap: '15px', flexWrap: 'wrap', alignItems: 'center' }}>
             <input 
               type="text" 
-              placeholder="Search by restaurant or username..." 
+              placeholder="البحث باسم المطعم أو المالك..." 
               value={searchTerm} 
               onChange={(e) => setSearchTerm(e.target.value)} 
               className="search-input"
+              style={{ flex: '1', minWidth: '250px' }}
             />
-            <button onClick={() => setShowForm(true)} className="add-btn">+ Create New Restaurant</button>
+            
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+              <label style={{ fontWeight: '600', color: '#555' }}>فلترة الاشتراك:</label>
+              <select 
+                value={filterSubStatus} 
+                onChange={(e) => setFilterSubStatus(e.target.value)}
+                className="search-input"
+                style={{ width: '180px', padding: '10px' }}
+              >
+                <option value="all">كل الاشتراكات</option>
+                <option value="active">{t.activeSub}</option>
+                <option value="expiring_soon">{t.expiringSoonSub}</option>
+                <option value="expired">{t.expiredSub}</option>
+              </select>
+            </div>
+
+            <button 
+              onClick={toggleSort} 
+              className="cancel-btn" 
+              style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 18px', background: sortByDays ? '#eef2ff' : '#f1f3f5', border: sortByDays ? '1px solid #667eea' : 'none' }}
+            >
+              <span>ترتيب حسب الأيام المتبقية</span>
+              {sortByDays === 'asc' ? '⬆️' : sortByDays === 'desc' ? '⬇️' : '↕️'}
+            </button>
           </div>
         </div>
 
         {message && <div className={`message ${message.includes('Error') || message.includes('❌') ? 'error' : 'success'}`}>{message}</div>}
 
+        {/* CREATE RESTAURANT MODAL */}
         {showForm && (
           <div className="modal">
-            <div className="modal-content">
-              <h2>Create New Restaurant</h2>
+            <div className="modal-content" style={{ maxWidth: '600px', textAlign: 'right' }}>
+              <h2>{t.createNewRestaurant}</h2>
               <form onSubmit={handleSubmit}>
                 <div className="form-group">
-                  <label>Restaurant Name *</label>
+                  <label>اسم المطعم *</label>
                   <input type="text" name="name" value={formData.name} onChange={handleInputChange} required />
                 </div>
 
                 <div className="form-group">
-                  <label>Owner Username * (Must be unique)</label>
-                  <input type="text" name="username" value={formData.username} onChange={handleInputChange} required placeholder="e.g., pizzamaster" />
+                  <label>اسم مستخدم المالك * (يجب أن يكون فريداً لتسجيل الدخول)</label>
+                  <input type="text" name="username" value={formData.username} onChange={handleInputChange} required placeholder="مثال: masterburger" />
                 </div>
 
                 <div className="form-group">
-                  <label>Owner Password *</label>
-                  <input type="password" name="password" value={formData.password} onChange={handleInputChange} required minLength="6" placeholder="Min 6 characters" />
+                  <label>كلمة مرور الحساب * (6 أحرف كحد أدنى)</label>
+                  <input type="password" name="password" value={formData.password} onChange={handleInputChange} required minLength="6" />
                 </div>
 
                 <div className="form-group">
-                  <label>Tagline</label>
-                  <input type="text" name="tagline" value={formData.tagline} onChange={handleInputChange} />
+                  <label>شعار المطعم / جملة وصفية</label>
+                  <input type="text" name="tagline" value={formData.tagline} onChange={handleInputChange} placeholder="مثال: ألذ المأكولات في العاصمة" />
                 </div>
 
                 <div className="form-group">
-                  <label>Theme Color</label>
+                  <label>لون الثيم للمنيو</label>
                   <div className="color-picker-wrapper">
                     <input type="color" name="color" value={formData.color} onChange={handleInputChange} className="color-picker" />
                     <span className="color-value">{formData.color}</span>
                   </div>
                 </div>
 
-                <div className="form-actions">
-                  <button type="button" onClick={() => setShowForm(false)} className="cancel-btn">Cancel</button>
-                  <button type="submit" className="submit-btn" disabled={loading}>{loading ? 'Creating...' : 'Create'}</button>
+                <hr style={{ margin: '20px 0', borderColor: '#eee' }} />
+                <h3 style={{ margin: '0 0 15px 0', color: '#4f46e5' }}>تفاصيل الاشتراك الأولي</h3>
+
+                <div className="form-group">
+                  <label>تاريخ بدء الاشتراك</label>
+                  <input type="date" name="sub_start_date" value={formData.sub_start_date} onChange={handleInputChange} required />
+                </div>
+
+                <div className="form-group">
+                  <label>مدة الاشتراك</label>
+                  <select name="sub_duration" value={formData.sub_duration} onChange={handleInputChange} className="search-input" style={{ width: '100%', boxSizing: 'border-box' }}>
+                    <option value="30">30 يوم (شهر)</option>
+                    <option value="90">90 يوم (3 أشهر)</option>
+                    <option value="365">365 يوم (سنة كاملة)</option>
+                    <option value="custom">فترة مخصصة</option>
+                  </select>
+                </div>
+
+                {formData.sub_duration === 'custom' && (
+                  <div className="form-group">
+                    <label>المدة بالأيام *</label>
+                    <input 
+                      type="number" 
+                      value={customDays} 
+                      onChange={(e) => setCustomDays(e.target.value)} 
+                      min="1" 
+                      required 
+                      placeholder="أدخل عدد الأيام" 
+                    />
+                  </div>
+                )}
+
+                <div className="form-actions" style={{ justifyContent: 'flex-start', gap: '15px' }}>
+                  <button type="submit" className="submit-btn" disabled={loading}>{loading ? 'جاري الإنشاء...' : 'إنشاء المطعم وتفعيل الاشتراك'}</button>
+                  <button type="button" onClick={() => setShowForm(false)} className="cancel-btn">إلغاء</button>
                 </div>
               </form>
             </div>
           </div>
         )}
 
+        {/* EXTEND SUBSCRIPTION MODAL */}
+        {showExtendModal && selectedRestForSub && (
+          <div className="modal">
+            <div className="modal-content" style={{ textAlign: 'right' }}>
+              <h2>تمديد الاشتراك لـ: {selectedRestForSub.name}</h2>
+              <p style={{ color: '#555', fontSize: '14px', marginBottom: '20px' }}>
+                تاريخ انتهاء الاشتراك الحالي: <strong>{selectedRestForSub.subscription ? new Date(selectedRestForSub.subscription.end_date).toLocaleDateString('ar-DZ') : 'غير محدد'}</strong>
+                <br />
+                (ملاحظة: إذا كان الاشتراك غير منتهٍ، سيتم إضافة الأيام فوق تاريخ الانتهاء الحالي. وإذا كان منتهياً، فسيتم تمديده بدءاً من تاريخ اليوم).
+              </p>
+              
+              <form onSubmit={handleExtendSubscription}>
+                <div className="form-group">
+                  <label>فترة التمديد</label>
+                  <select 
+                    value={extendDuration} 
+                    onChange={(e) => setExtendDuration(e.target.value)} 
+                    className="search-input" 
+                    style={{ width: '100%', boxSizing: 'border-box' }}
+                  >
+                    <option value="30">30 يوم (شهر)</option>
+                    <option value="90">90 يوم (3 أشهر)</option>
+                    <option value="365">365 يوم (سنة)</option>
+                    <option value="custom">فترة مخصصة باليوم</option>
+                  </select>
+                </div>
+
+                {extendDuration === 'custom' && (
+                  <div className="form-group">
+                    <label>عدد الأيام المطلوب إضافتها *</label>
+                    <input 
+                      type="number" 
+                      value={extendCustomDays} 
+                      onChange={(e) => setExtendCustomDays(e.target.value)} 
+                      min="1" 
+                      required 
+                      placeholder="عدد الأيام" 
+                    />
+                  </div>
+                )}
+
+                <div className="form-group">
+                  <label>ملاحظات (طريقة الدفع، إلخ)</label>
+                  <input 
+                    type="text" 
+                    value={extendNotes} 
+                    onChange={(e) => setExtendNotes(e.target.value)} 
+                    placeholder="مثال: دفع نقدي كاش، تحويل CCP" 
+                  />
+                </div>
+
+                <div className="form-actions" style={{ justifyContent: 'flex-start', gap: '12px' }}>
+                  <button type="submit" className="submit-btn" disabled={loading}>{loading ? 'جاري التمديد...' : 'تأكيد التمديد'}</button>
+                  <button type="button" onClick={() => { setShowExtendModal(false); setSelectedRestForSub(null); }} className="cancel-btn">إلغاء</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* SUBSCRIPTION HISTORY MODAL */}
+        {showHistoryModal && (
+          <div className="modal">
+            <div className="modal-content" style={{ maxWidth: '700px', textAlign: 'right' }}>
+              <h2>سجل اشتراكات مطعم: {historyRestName}</h2>
+              
+              <div style={{ maxHeight: '400px', overflowY: 'auto', marginTop: '15px' }}>
+                <table style={{ fontSize: '13px' }}>
+                  <thead style={{ background: '#f8f9fa' }}>
+                    <tr>
+                      <th style={{ textAlign: 'right' }}>العملية</th>
+                      <th style={{ textAlign: 'right' }}>المدة مضافة</th>
+                      <th style={{ textAlign: 'right' }}>تاريخ النهاية الجديد</th>
+                      <th style={{ textAlign: 'right' }}>بواسطة</th>
+                      <th style={{ textAlign: 'right' }}>ملاحظات</th>
+                      <th style={{ textAlign: 'right' }}>التاريخ</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {historyList.length > 0 ? (
+                      historyList.map(h => (
+                        <tr key={h.id}>
+                          <td>{h.action_type === 'create' ? 'إنشاء وتفعيل' : 'تمديد يدوي'}</td>
+                          <td><strong>+{h.duration_days} يوم</strong></td>
+                          <td>{new Date(h.new_end_date).toLocaleDateString('ar-DZ')}</td>
+                          <td>{h.users?.username || 'النظام'}</td>
+                          <td>{h.notes || '-'}</td>
+                          <td>{new Date(h.created_at).toLocaleDateString('ar-DZ')}</td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr><td colSpan="6" style={{ textAlign: 'center', color: '#999' }}>لا توجد عمليات مسجلة بعد.</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+              
+              <div className="form-actions" style={{ justifyContent: 'flex-start', marginTop: '20px' }}>
+                <button type="button" onClick={() => { setShowHistoryModal(false); setHistoryList([]); }} className="cancel-btn">إغلاق السجل</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* CREATE OWNER MODAL */}
         {showCreateOwner && selectedRestForOwner && (
           <div className="modal">
-            <div className="modal-content">
-              <h2>Create Owner for {selectedRestForOwner.name}</h2>
+            <div className="modal-content" style={{ textAlign: 'right' }}>
+              <h2>إنشاء حساب مالك لـ: {selectedRestForOwner.name}</h2>
               <form onSubmit={handleCreateOwner}>
                 <div className="form-group">
-                  <label>Owner Username * (Must be unique)</label>
+                  <label>اسم المستخدم للمالك *</label>
                   <input 
                     type="text" 
                     name="username" 
                     value={ownerForm.username} 
                     onChange={handleOwnerInputChange} 
                     required 
-                    placeholder="e.g., pizzamaster" 
+                    placeholder="مثال: masterpizza" 
                   />
                 </div>
 
                 <div className="form-group">
-                  <label>Owner Password *</label>
+                  <label>كلمة المرور للمالك * (6 أحرف كحد أدنى)</label>
                   <input 
                     type="password" 
                     name="password" 
@@ -410,26 +836,28 @@ export default function AdminPanel() {
                     onChange={handleOwnerInputChange} 
                     required 
                     minLength="6" 
-                    placeholder="Min 6 characters" 
                   />
                 </div>
 
-                <div className="form-actions">
-                  <button type="button" onClick={() => setShowCreateOwner(false)} className="cancel-btn">Cancel</button>
-                  <button type="submit" className="submit-btn" disabled={loading}>{loading ? 'Creating...' : 'Create Owner'}</button>
+                <div className="form-actions" style={{ justifyContent: 'flex-start', gap: '12px' }}>
+                  <button type="submit" className="submit-btn" disabled={loading}>{loading ? 'جاري الإنشاء...' : 'إنشاء الحساب'}</button>
+                  <button type="button" onClick={() => setShowCreateOwner(false)} className="cancel-btn">إلغاء</button>
                 </div>
               </form>
             </div>
           </div>
         )}
 
-        <div className="restaurants-table">
+        {/* RESTAURANTS TABLE */}
+        <div className="restaurants-table" style={{ marginTop: '20px' }}>
           <table>
-            <thead>
+            <thead style={{ background: '#f8f9fa' }}>
               <tr>
-                <th>Restaurant</th>
-                <th>Status</th>
-                <th>Actions</th>
+                <th style={{ textAlign: 'right' }}>المطعم والمالك</th>
+                <th style={{ textAlign: 'right' }}>حالة التشغيل</th>
+                <th style={{ textAlign: 'right' }}>حالة الاشتراك</th>
+                <th style={{ textAlign: 'right' }}>الأيام المتبقية</th>
+                <th style={{ textAlign: 'right' }}>إجراءات</th>
               </tr>
             </thead>
             <tbody>
@@ -437,58 +865,88 @@ export default function AdminPanel() {
                 filteredRestaurants.map(restaurant => (
                   <tr key={restaurant.id}>
                     <td>
-                      <div className="restaurant-info">
-                        <div className="color-dot" style={{ backgroundColor: restaurant.color || '#667eea' }} />
+                      <div className="restaurant-info" style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
+                        <div className="color-dot" style={{ backgroundColor: restaurant.color || '#667eea', width: '25px', height: '25px', borderRadius: '50%' }} />
                         <div>
-                          <div className="restaurant-name">{restaurant.name}</div>
+                          <div className="restaurant-name" style={{ fontWeight: '600', fontSize: '15px' }}>{restaurant.name}</div>
                           {restaurant.users && restaurant.users.length > 0 ? (
-                            <div className="restaurant-owner-info" style={{ fontSize: '13px', color: '#555', marginTop: '2px' }}>
+                            <div style={{ fontSize: '12px', color: '#555', marginTop: '2px' }}>
                               👤 {restaurant.users.map(u => u.username || u.email).join(', ')}
                             </div>
                           ) : (
-                            <div className="restaurant-owner-info no-owner" style={{ fontSize: '13px', color: '#ff4444', fontStyle: 'italic', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              <span>No Owner Account</span>
-                              <button 
-                                onClick={() => handleOpenCreateOwner(restaurant)}
-                                style={{
-                                  padding: '2px 8px',
-                                  fontSize: '11px',
-                                  backgroundColor: '#e53e3e',
-                                  color: '#fff',
-                                  border: 'none',
-                                  borderRadius: '4px',
-                                  cursor: 'pointer',
-                                  fontStyle: 'normal',
-                                  fontWeight: '500'
-                                }}
-                              >
-                                Create Owner
-                              </button>
+                            <div className="no-owner" style={{ fontSize: '12px', color: '#ff4444', fontStyle: 'italic', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <span>لا يوجد حساب مالك</span>
+                              <button onClick={() => handleOpenCreateOwner(restaurant)} style={{ padding: '1px 6px', fontSize: '10px', backgroundColor: '#dc2626', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>إنشاء حساب</button>
                             </div>
                           )}
-                          <div className="restaurant-tagline" style={{ marginTop: '2px' }}>{restaurant.tagline}</div>
                         </div>
                       </div>
                     </td>
                     <td>
                       <button className={`status-btn ${restaurant.is_active ? 'active' : 'inactive'}`} 
                         onClick={() => toggleActive(restaurant.id, restaurant.is_active)}>
-                        {restaurant.is_active ? 'Active' : 'Inactive'}
+                        {restaurant.is_active ? t.active : t.inactive}
                       </button>
                     </td>
                     <td>
-                      <div className="action-buttons">
-                        <button onClick={() => handleImpersonate(restaurant.id)} className="impersonate-btn" disabled={loading}>
-                          Enter Owner View
+                      {restaurant.daysLeft !== null ? (
+                        restaurant.daysLeft <= 0 ? (
+                          <span style={{ padding: '4px 10px', borderRadius: '12px', fontSize: '12px', fontWeight: 'bold', backgroundColor: '#fee2e2', color: '#ef4444' }}>
+                            {t.expiredSub}
+                          </span>
+                        ) : restaurant.daysLeft <= 7 ? (
+                          <span style={{ padding: '4px 10px', borderRadius: '12px', fontSize: '12px', fontWeight: 'bold', backgroundColor: '#fef3c7', color: '#d97706' }}>
+                            {t.expiringSoonSub}
+                          </span>
+                        ) : (
+                          <span style={{ padding: '4px 10px', borderRadius: '12px', fontSize: '12px', fontWeight: 'bold', backgroundColor: '#d1fae5', color: '#059669' }}>
+                            {t.activeSub}
+                          </span>
+                        )
+                      ) : (
+                        <span style={{ padding: '4px 10px', borderRadius: '12px', fontSize: '12px', fontWeight: 'bold', backgroundColor: '#f3f4f6', color: '#6b7280' }}>
+                          بدون اشتراك
+                        </span>
+                      )}
+                    </td>
+                    <td style={{ fontWeight: '600' }}>
+                      {restaurant.daysLeft !== null ? (
+                        restaurant.daysLeft <= 0 ? (
+                          <span style={{ color: '#ef4444' }}>منتهي (0 يوم)</span>
+                        ) : (
+                          <span>{restaurant.daysLeft} يوم</span>
+                        )
+                      ) : (
+                        <span style={{ color: '#999' }}>-</span>
+                      )}
+                    </td>
+                    <td>
+                      <div className="action-buttons" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'flex-start' }}>
+                        <button onClick={() => handleImpersonate(restaurant.id)} className="impersonate-btn" style={{ padding: '5px 10px', fontSize: '12px' }} disabled={loading}>
+                          لوحة التحكم المالك
                         </button>
-                        <Link to={`/admin/restaurant/${restaurant.id}`} className="edit-restaurant-btn">Edit Menu</Link>
-                        <button onClick={() => deleteRestaurant(restaurant.id)} className="delete-btn">Delete</button>
+                        <button 
+                          onClick={() => { setSelectedRestForSub(restaurant); setExtendDuration('30'); setShowExtendModal(true); }}
+                          className="submit-btn" 
+                          style={{ padding: '5px 10px', fontSize: '12px', backgroundColor: '#10b981' }}
+                        >
+                          تمديد الاشتراك
+                        </button>
+                        <button 
+                          onClick={() => handleShowHistory(restaurant)}
+                          className="cancel-btn" 
+                          style={{ padding: '5px 10px', fontSize: '12px' }}
+                        >
+                          السجل
+                        </button>
+                        <Link to={`/admin/restaurant/${restaurant.id}`} className="edit-restaurant-btn" style={{ padding: '5px 10px', fontSize: '12px', margin: 0 }}>تعديل المنيو</Link>
+                        <button onClick={() => deleteRestaurant(restaurant.id)} className="delete-btn" style={{ padding: '5px 10px', fontSize: '12px' }}>حذف</button>
                       </div>
                     </td>
                   </tr>
                 ))
               ) : (
-                <tr><td colSpan="3" style={{textAlign: 'center', padding: '20px', color: '#999'}}>No restaurants found.</td></tr>
+                <tr><td colSpan="5" style={{textAlign: 'center', padding: '30px', color: '#999'}}>لا توجد مطاعم مطابقة للبحث.</td></tr>
               )}
             </tbody>
           </table>
