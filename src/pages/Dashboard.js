@@ -108,7 +108,7 @@ export default function Dashboard() {
     } catch (e) {
       console.error('Error checking archiving status:', e);
     }
-  }, [restaurantId]);
+  }, [restaurantId, t, restaurantId]);
   const fetchArchivedReports = useCallback(async () => {
     if (!restaurantId) return;
     try {
