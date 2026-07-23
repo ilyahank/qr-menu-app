@@ -15,8 +15,7 @@ export default function OrdersManagement() {
   const [restaurantId, setRestaurantId] = useState(null);
   const [statusFilter, setStatusFilter] = useState('all');
 
-  // Print state for rendering hidden receipt
-  const [printData, setPrintData] = useState(null);
+  // Print error message
   const [printErrorMsg, setPrintErrorMsg] = useState('');
 
   useEffect(() => {
@@ -176,7 +175,7 @@ export default function OrdersManagement() {
     }
   };
 
-  // Browser Print handler
+  // Browser Print handler - using new window approach
   const handlePrint = async (order, type) => {
     try {
       // 1. Check if print job already exists
@@ -196,10 +195,7 @@ export default function OrdersManagement() {
         if (!confirmReprint) return;
       }
 
-      // 2. Prepare receipt payload
-      setPrintData({ order, type });
-
-      // 3. Insert or update print_jobs table for double-print protection
+      // 2. Insert or update print_jobs table for double-print protection
       if (existingJob) {
         await supabase
           .from('print_jobs')
@@ -217,19 +213,208 @@ export default function OrdersManagement() {
           }]);
       }
 
-      // 4. Trigger browser print dialog (requires timeout for DOM render)
-      setTimeout(() => {
-        window.print();
-        // Clear print data after print dialog closes
-        setTimeout(() => {
-          setPrintData(null);
-        }, 1000);
-      }, 500);
+      // 3. Generate receipt HTML
+      const receiptHTML = generateReceiptHTML(order, type);
+
+      // 4. Open new window and print
+      const printWindow = window.open('', '', 'height=600,width=800');
+      printWindow.document.write(receiptHTML);
+      printWindow.document.close();
+      printWindow.print();
 
     } catch (error) {
       console.error(error);
-      setPrintErrorMsg(t.printError);
+      setPrintErrorMsg(t.dir === 'rtl' ? 'فشل الطباعة: ' + error.message : 'Print error: ' + error.message);
       setTimeout(() => setPrintErrorMsg(''), 6000);
+    }
+  };
+
+  const generateReceiptHTML = (order, type) => {
+    const isRtl = t?.dir === 'rtl';
+    const date = new Date(order.created_at).toLocaleString('ar-DZ');
+    
+    if (type === 'customer') {
+      // Customer Receipt
+      return `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <style>
+            body { 
+              font-family: Arial, sans-serif; 
+              max-width: 400px; 
+              margin: 0; 
+              padding: 20px; 
+              direction: ${isRtl ? 'rtl' : 'ltr'};
+            }
+            .receipt { 
+              border: 1px solid #ccc; 
+              padding: 20px; 
+              background: white; 
+            }
+            .header { text-align: center; margin-bottom: 20px; }
+            .header h1 { margin: 0; font-size: 24px; }
+            .divider { border-top: 1px solid #ccc; margin: 10px 0; }
+            .item { display: flex; justify-content: space-between; margin: 10px 0; }
+            .total { font-weight: bold; font-size: 18px; text-align: right; }
+            .footer { text-align: center; margin-top: 20px; font-size: 12px; color: #666; }
+            .barcode { 
+              font-family: monospace; 
+              font-size: 14px; 
+              letter-spacing: 2px;
+              border: 1px solid black;
+              padding: 5px;
+              text-align: center;
+              margin-top: 10px;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="receipt">
+            <div class="header">
+              <h1>${restaurant?.name || 'Restaurant'}</h1>
+              ${restaurant?.tagline ? `<p>${restaurant.tagline}</p>` : ''}
+              ${restaurant?.address ? `<p>${restaurant.address}</p>` : ''}
+              ${restaurant?.phone ? `<p>${isRtl ? 'هاتف:' : 'Tel:'} ${restaurant.phone}</p>` : ''}
+            </div>
+            
+            <div class="divider"></div>
+            
+            <p><strong>${isRtl ? 'طاولة:' : 'Table:'}</strong> ${order.table_number}</p>
+            <p><strong>${isRtl ? 'التاريخ:' : 'Date:'}</strong> ${date}</p>
+            <p><strong>${isRtl ? 'رقم الطلب:' : 'Order ID:'}</strong> ${order.id.slice(0, 12).toUpperCase()}</p>
+            
+            <div class="divider"></div>
+            
+            <h3>${isRtl ? 'العناصر:' : 'Items:'}</h3>
+            ${order.order_items ? order.order_items.map(item => `
+              <div class="item">
+                <span>${item.menu_items?.name} x ${item.quantity}</span>
+                <span>${(item.price * item.quantity).toFixed(0)} ${t?.currency || 'DA'}</span>
+              </div>
+            `).join('') : '<p>No items</p>'}
+            
+            ${order.notes ? `
+              <div class="divider"></div>
+              <p><strong>${isRtl ? 'ملاحظات:' : 'Notes:'}</strong> ${order.notes}</p>
+            ` : ''}
+            
+            <div class="divider"></div>
+            
+            <div class="item">
+              <span>${isRtl ? 'المجموع:' : 'Subtotal:'}</span>
+              <span>${order.total_price.toFixed(0)} ${t?.currency || 'DA'}</span>
+            </div>
+            <div class="item">
+              <span>${isRtl ? 'الضريبة (0%):' : 'Tax (0%):'}</span>
+              <span>0 ${t?.currency || 'DA'}</span>
+            </div>
+            <div class="total" style="margin-top: 10px;">
+              <span>${isRtl ? 'الإجمالي:' : 'TOTAL:'} ${order.total_price.toFixed(0)} ${t?.currency || 'DA'}</span>
+            </div>
+            
+            <div class="divider"></div>
+            
+            <div class="footer">
+              <p>${isRtl ? 'شكراً لزيارتكم' : 'Thank you for your visit!'}</p>
+              <p>${new Date().toLocaleDateString()}</p>
+            </div>
+            
+            <div class="barcode">
+              ${order.id.slice(0, 12).toUpperCase()}
+            </div>
+          </div>
+        </body>
+        </html>
+      `;
+    } else {
+      // Kitchen Receipt
+      return `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <style>
+            body { 
+              font-family: Arial, sans-serif; 
+              max-width: 400px; 
+              margin: 0; 
+              padding: 20px; 
+              direction: ${isRtl ? 'rtl' : 'ltr'};
+            }
+            .receipt { 
+              border: 3px solid black; 
+              padding: 20px; 
+              background: white; 
+            }
+            .header { text-align: center; margin-bottom: 20px; }
+            .header h1 { 
+              margin: 0; 
+              font-size: 32px; 
+              font-weight: bold; 
+              border: 4px solid black; 
+              padding: 10px 20px;
+            }
+            .divider { border-top: 2px dashed #000; margin: 10px 0; }
+            .item { 
+              display: flex; 
+              justify-content: space-between; 
+              margin: 15px 0; 
+              font-size: 18px;
+              font-weight: bold;
+            }
+            .quantity { 
+              font-size: 24px; 
+              border: 3px solid black; 
+              padding: 4px 12px; 
+              min-width: 50px; 
+              text-align: center;
+            }
+            .notes { 
+              border: 3px solid black; 
+              padding: 15px; 
+              text-align: center; 
+              margin: 20px 0;
+              font-size: 18px;
+              font-weight: bold;
+            }
+            .footer { text-align: center; margin-top: 20px; font-size: 12px; }
+          </style>
+        </head>
+        <body>
+          <div class="receipt">
+            <div class="header">
+              <h1>${isRtl ? 'طاولة' : 'TABLE'} ${order.table_number}</h1>
+              <h2>${isRtl ? 'طلب المطبخ' : 'KITCHEN ORDER'}</h2>
+              <p>${new Date(order.created_at).toLocaleTimeString('ar-DZ')}</p>
+            </div>
+            
+            <div class="divider"></div>
+            
+            ${order.order_items ? order.order_items.map(item => `
+              <div class="item">
+                <span style="flex: 1;">${item.menu_items?.name}</span>
+                <span class="quantity">x${item.quantity}</span>
+              </div>
+            `).join('') : '<p>No items</p>'}
+            
+            ${order.notes ? `
+              <div class="notes">
+                <strong>${isRtl ? 'ملاحظات المطبخ' : 'KITCHEN NOTES'}</strong>
+                <p>${order.notes}</p>
+              </div>
+            ` : ''}
+            
+            <div class="divider"></div>
+            
+            <div class="footer">
+              <p><strong>${isRtl ? 'عدد العناصر:' : 'Total Items:'}</strong> ${order.order_items?.length || 0}</p>
+            </div>
+          </div>
+        </body>
+        </html>
+      `;
     }
   };
 
@@ -399,117 +584,6 @@ export default function OrdersManagement() {
           )}
         </div>
       </div>
-
-      {/* DYNAMIC RECIEPT PRINT CONTAINER (HIDDEN VIA CSS EXCEPT DURING PRINT) */}
-      {printData && (
-        <div id="thermal-print-section" className={printData.type} style={{ direction: isRtl ? 'rtl' : 'ltr', fontFamily: 'monospace', width: '58mm', fontSize: '12px', padding: '5px', color: '#000', background: '#fff' }}>
-          {printData.type === 'customer' ? (
-            // Customer Receipt
-            <div className="receipt-customer">
-              <div style={{ textAlign: 'center', marginBottom: '10px' }}>
-                <h2 style={{ margin: '0 0 5px 0', fontSize: '18px', fontWeight: 'bold' }}>{restaurant?.name}</h2>
-                {restaurant?.tagline && <p style={{ margin: '0', fontSize: '10px' }}>{restaurant.tagline}</p>}
-                {restaurant?.address && <p style={{ margin: '2px 0', fontSize: '9px' }}>{restaurant.address}</p>}
-                {restaurant?.phone && <p style={{ margin: '2px 0', fontSize: '9px' }}>{isRtl ? 'هاتف:' : 'Tel:'} {restaurant.phone}</p>}
-                <p style={{ margin: '5px 0', fontSize: '11px' }}>{'='.repeat(32)}</p>
-                <h3 style={{ margin: '0', fontSize: '16px', fontWeight: 'bold' }}>{isRtl ? 'طاولة' : 'Table'}: {printData.order.table_number}</h3>
-                <p style={{ margin: '5px 0', fontSize: '10px' }}>{new Date(printData.order.created_at).toLocaleString('ar-DZ')}</p>
-                <p style={{ margin: '5px 0', fontSize: '11px' }}>{'='.repeat(32)}</p>
-              </div>
-
-              <div style={{ margin: '10px 0' }}>
-                {printData.order.order_items.map(item => (
-                  <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '12px' }}>
-                    <span style={{ flex: 1 }}>{item.menu_items?.name}</span>
-                    <span style={{ fontWeight: 'bold' }}>x{item.quantity}</span>
-                    <span style={{ fontWeight: 'bold' }}>{(parseFloat(item.price) * item.quantity).toFixed(0)} {t.currency}</span>
-                  </div>
-                ))}
-              </div>
-
-              {printData.order.notes && (
-                <div style={{ margin: '10px 0', padding: '5px', border: '1px dashed #000', fontSize: '10px' }}>
-                  <strong>{isRtl ? 'ملاحظات:' : 'Notes:'}</strong>
-                  <p style={{ margin: '4px 0 0 0' }}>{printData.order.notes}</p>
-                </div>
-              )}
-
-              <div style={{ textAlign: 'center', marginTop: '15px' }}>
-                <p style={{ margin: '5px 0', fontSize: '11px' }}>{'='.repeat(32)}</p>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', padding: '0 5px', marginBottom: '5px' }}>
-                  <span>{isRtl ? 'المجموع' : 'Subtotal'}:</span>
-                  <span>{parseFloat(printData.order.total_price).toFixed(0)} {t.currency}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', padding: '0 5px', marginBottom: '5px' }}>
-                  <span>{isRtl ? 'الضريبة (0%)' : 'Tax (0%)'}:</span>
-                  <span>0 {t.currency}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '16px', padding: '0 5px', borderTop: '1px solid black', paddingTop: '5px' }}>
-                  <span>{isRtl ? 'الإجمالي' : 'TOTAL'}:</span>
-                  <span>{parseFloat(printData.order.total_price).toFixed(0)} {t.currency}</span>
-                </div>
-                <p style={{ margin: '5px 0', fontSize: '11px' }}>{'='.repeat(32)}</p>
-                <p style={{ margin: '8px 0 0 0', fontSize: '11px', fontWeight: 'bold' }}>{isRtl ? 'شكراً لزيارتكم' : 'Thank you for your visit'}</p>
-                <p style={{ margin: '2px 0 0 0', fontSize: '9px', color: '#666' }}>{restaurant?.phone || ''}</p>
-                <div style={{ marginTop: '10px', textAlign: 'center' }}>
-                  <div style={{ 
-                    fontSize: '10px', 
-                    fontFamily: 'monospace', 
-                    letterSpacing: '2px',
-                    border: '1px solid black',
-                    padding: '5px',
-                    display: 'inline-block'
-                  }}>
-                    {printData.order.id.slice(0, 12).toUpperCase()}
-                  </div>
-                </div>
-              </div>
-            </div>
-          ) : (
-            // Kitchen Copy (Prices hidden, table number large, only quantities and notes)
-            <div className="receipt-kitchen">
-              <div style={{ textAlign: 'center', marginBottom: '10px' }}>
-                <h1 style={{ margin: '0', fontSize: '32px', fontWeight: 'bold', border: '4px solid black', padding: '10px 20px' }}>
-                  {isRtl ? 'طاولة' : 'TABLE'} {printData.order.table_number}
-                </h1>
-                <h2 style={{ margin: '10px 0 5px 0', fontSize: '18px', fontWeight: 'bold' }}>
-                  {isRtl ? 'طلب المطبخ' : 'KITCHEN ORDER'}
-                </h2>
-                <p style={{ margin: '5px 0', fontSize: '11px' }}>{new Date(printData.order.created_at).toLocaleTimeString('ar-DZ')}</p>
-                <p style={{ margin: '5px 0', fontSize: '11px' }}>{'='.repeat(32)}</p>
-              </div>
-
-              <div style={{ margin: '10px 0' }}>
-                {printData.order.order_items.map(item => (
-                  <div key={item.id} style={{ marginBottom: '15px', fontSize: '16px', borderBottom: '2px dashed #000', paddingBottom: '10px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontWeight: 'bold', fontSize: '18px', flex: 1 }}>{item.menu_items?.name}</span>
-                      <span style={{ fontSize: '24px', fontWeight: 'bold', border: '3px solid black', padding: '4px 12px', minWidth: '50px', textAlign: 'center', marginLeft: '10px' }}>
-                        x{item.quantity}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {printData.order.notes && (
-                <div style={{ margin: '20px 0', padding: '15px', border: '3px solid black', background: '#fff', textAlign: 'center' }}>
-                  <strong style={{ fontSize: '16px', textDecoration: 'underline' }}>
-                    {isRtl ? 'ملاحظات المطبخ' : 'KITCHEN NOTES'}
-                  </strong>
-                  <p style={{ margin: '10px 0 0 0', fontSize: '18px', fontWeight: 'bold' }}>{printData.order.notes}</p>
-                </div>
-              )}
-
-              <div style={{ textAlign: 'center', marginTop: '20px' }}>
-                <p style={{ margin: '5px 0', fontSize: '11px' }}>{'='.repeat(32)}</p>
-                <p style={{ margin: '5px 0', fontSize: '12px', fontWeight: 'bold' }}>{isRtl ? 'عدد العناصر:' : 'Total Items:'} {printData.order.order_items.length}</p>
-                <p style={{ margin: '5px 0', fontSize: '11px' }}>{'='.repeat(32)}</p>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
     </div>
   );
 }
