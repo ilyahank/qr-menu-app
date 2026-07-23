@@ -18,6 +18,7 @@ import Settings from './pages/Settings';
 import QRCodePage from './pages/QRCodePage';
 import OrdersManagement from './pages/OrdersManagement';
 import Analytics from './pages/Analytics';
+import TablesManagement from './pages/TablesManagement';
 
 import './App.css';
 
@@ -39,6 +40,7 @@ function App() {
             <Route path="/dashboard/qr-code" element={<PrivateRoute><QRCodePage /></PrivateRoute>} />
             <Route path="/dashboard/orders" element={<PrivateRoute><OrdersManagement /></PrivateRoute>} />
             <Route path="/dashboard/analytics" element={<PrivateRoute><Analytics /></PrivateRoute>} />
+            <Route path="/dashboard/tables" element={<PrivateRoute><TablesManagement /></PrivateRoute>} />
             
             {/* Admin Routes */}
             <Route path="/admin" element={<AdminRoute><AdminPanel /></AdminRoute>} />
