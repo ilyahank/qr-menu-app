@@ -70,7 +70,12 @@ export default function PublicMenu() {
         
         setLoading(false);
       } catch (err) {
-        setError(t.loadingMenu);
+        console.error(err);
+        if (err.code === 'PGRST116' || err.message?.includes('invalid input syntax for type uuid')) {
+          setError(t.dir === 'rtl' ? 'المطعم غير موجود' : t.dir === 'fr' ? 'Restaurant non trouvé' : 'Restaurant not found');
+        } else {
+          setError(t.restaurantUnavailable);
+        }
         setLoading(false);
       }
     };
@@ -198,8 +203,44 @@ export default function PublicMenu() {
       <p>Loading menu...</p>
     </div>
   );
-  if (error) return <div className="public-menu error"><h1>Oops!</h1><p>{error}</p></div>;
-  if (!restaurant) return <div className="public-menu error"><h1>Restaurant Not Found</h1></div>;
+
+  if (error) {
+    return (
+      <div className="public-menu error-page" style={{ direction: t.dir }}>
+        <div className="error-card">
+          <div className="error-icon">🍽️</div>
+          <h2>{t.dir === 'rtl' ? 'المنيو غير متوفر' : t.dir === 'fr' ? 'Menu Non Disponible' : 'Menu Unavailable'}</h2>
+          <p className="error-message">{error}</p>
+          <div className="error-divider"></div>
+          <p className="error-footer">
+            {t.dir === 'rtl' 
+              ? 'يرجى مراجعة إدارة المطعم لتجديد الاشتراك أو تفعيل المنيو.' 
+              : t.dir === 'fr' 
+              ? 'Veuillez contacter l\'administration du restaurant pour renouveler l\'abonnement.' 
+              : 'Please contact the restaurant administration to renew the subscription.'}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!restaurant) {
+    return (
+      <div className="public-menu error-page" style={{ direction: t.dir }}>
+        <div className="error-card">
+          <div className="error-icon">🔍</div>
+          <h2>{t.dir === 'rtl' ? 'المطعم غير موجود' : t.dir === 'fr' ? 'Restaurant Non Trouvé' : 'Restaurant Not Found'}</h2>
+          <p className="error-message">
+            {t.dir === 'rtl' 
+              ? 'لم نتمكن من العثور على المطعم المطلوب. يرجى التأكد من الرابط.' 
+              : t.dir === 'fr' 
+              ? 'Nous n\'avons pas pu trouver le restaurant demandé. Veuillez vérifier le lien.' 
+              : 'We could not find the requested restaurant. Please verify the link.'}
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   const isRtl = t.dir === 'rtl';
 
