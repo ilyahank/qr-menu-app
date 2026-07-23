@@ -264,81 +264,32 @@ export default function AdminPanel() {
         }
       }
 
-      // Check current subscription end date
-      const { data: subData } = await supabase
-        .from('subscriptions')
-        .select('*')
-        .eq('restaurant_id', selectedRestForSub.id)
-        .single();
+      // Get user session to retrieve the JWT token
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
 
-      let currentEndDate = null;
-      let newEndDate = new Date();
-
-      if (subData) {
-        currentEndDate = new Date(subData.end_date);
-        const today = new Date();
-        
-        if (currentEndDate > today) {
-          // Active: extend from the old end date
-          newEndDate = new Date(currentEndDate);
-          newEndDate.setDate(newEndDate.getDate() + durationDays);
-        } else {
-          // Expired: extend from today
-          newEndDate.setDate(newEndDate.getDate() + durationDays);
-        }
-      } else {
-        // No sub record: extend from today
-        newEndDate.setDate(newEndDate.getDate() + durationDays);
+      if (!token) {
+        throw new Error('No active session found. Please log in again.');
       }
 
-      newEndDate.setHours(23, 59, 59, 999);
-
-      // Determine new status
-      const today = new Date();
-      const diffTime = newEndDate - today;
-      const days = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      const status = days <= 0 ? 'expired' : (days <= 7 ? 'expiring_soon' : 'active');
-
-      if (subData) {
-        // Update subscription
-        const { error } = await supabase
-          .from('subscriptions')
-          .update({
-            end_date: newEndDate,
-            status: status,
-            updated_at: new Date()
-          })
-          .eq('restaurant_id', selectedRestForSub.id);
-
-        if (error) throw error;
-      } else {
-        // Insert subscription
-        const { error } = await supabase
-          .from('subscriptions')
-          .insert([{
-            restaurant_id: selectedRestForSub.id,
-            start_date: new Date(),
-            end_date: newEndDate,
-            status: status
-          }]);
-
-        if (error) throw error;
-      }
-
-      // Log to history
-      const { error: histError } = await supabase
-        .from('subscription_history')
-        .insert([{
+      // Call serverless API to perform the extension securely via service role key (bypassing RLS)
+      const response = await fetch('/api/extend-subscription', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
           restaurant_id: selectedRestForSub.id,
-          extended_by: currentUser?.id || null,
-          action_type: 'extend',
-          old_end_date: currentEndDate,
-          new_end_date: newEndDate,
           duration_days: durationDays,
-          notes: extendNotes || 'Manual extension'
-        }]);
+          extend_notes: extendNotes || 'Manual extension'
+        })
+      });
 
-      if (histError) throw histError;
+      const resData = await response.json();
+      if (!response.ok) {
+        throw new Error(resData.error || 'Failed to extend subscription');
+      }
 
       alert('✅ Subscription extended successfully!');
       setShowExtendModal(false);
@@ -348,7 +299,8 @@ export default function AdminPanel() {
       setExtendNotes('');
       await fetchRestaurants();
     } catch (error) {
-      alert('❌ Error extending subscription: ' + error.message);
+      console.error(error);
+      alert('Error extending subscription: ' + error.message);
     } finally {
       setLoading(false);
     }
