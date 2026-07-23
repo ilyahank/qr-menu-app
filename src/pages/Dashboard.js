@@ -113,6 +113,7 @@ export default function Dashboard() {
       checkArchivingStatus();
       fetchArchivedReports();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [restaurantId]);
 
   const triggerAutoArchive = async (rId, yr, mth) => {
