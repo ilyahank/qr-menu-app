@@ -206,6 +206,7 @@ export default function Analytics() {
               <Link to="/dashboard/orders" className="nav-link">{t.orders}</Link>
               <Link to="/dashboard/menu" className="nav-link">{t.menu}</Link>
               <Link to="/dashboard/categories" className="nav-link">{t.categories}</Link>
+              <Link to="/dashboard/tables" className="nav-link">{t.dir === 'rtl' ? 'الطاولات' : 'Tables'}</Link>
               <Link to="/dashboard/qr-code" className="nav-link">{t.qrCode}</Link>
               <Link to="/dashboard/settings" className="nav-link">{t.settings}</Link>
             </>

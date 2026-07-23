@@ -200,6 +200,7 @@ export default function OrdersManagement() {
           <Link to="/dashboard/orders" className="nav-link active">{t.orders}</Link>
           <Link to="/dashboard/menu" className="nav-link">{t.menu}</Link>
           <Link to="/dashboard/categories" className="nav-link">{t.categories}</Link>
+          <Link to="/dashboard/tables" className="nav-link">{t.dir === 'rtl' ? 'الطاولات' : 'Tables'}</Link>
           <Link to="/dashboard/qr-code" className="nav-link">{t.qrCode}</Link>
           <Link to="/dashboard/settings" className="nav-link">{t.settings}</Link>
           <LangSwitcher />
@@ -318,67 +319,85 @@ export default function OrdersManagement() {
 
       {/* DYNAMIC RECIEPT PRINT CONTAINER (HIDDEN VIA CSS EXCEPT DURING PRINT) */}
       {printData && (
-        <div id="thermal-print-section" className={printData.type} style={{ direction: 'rtl', fontFamily: 'monospace', width: '58mm', fontSize: '12px', padding: '5px', color: '#000', background: '#fff' }}>
+        <div id="thermal-print-section" className={printData.type} style={{ direction: isRtl ? 'rtl' : 'ltr', fontFamily: 'monospace', width: '58mm', fontSize: '12px', padding: '5px', color: '#000', background: '#fff' }}>
           {printData.type === 'customer' ? (
             // Customer Receipt
             <div className="receipt-customer">
               <div style={{ textAlign: 'center', marginBottom: '10px' }}>
-                <h2 style={{ margin: '0 0 5px 0', fontSize: '16px' }}>{restaurant?.name}</h2>
+                <h2 style={{ margin: '0 0 5px 0', fontSize: '18px', fontWeight: 'bold' }}>{restaurant?.name}</h2>
                 {restaurant?.tagline && <p style={{ margin: '0', fontSize: '10px' }}>{restaurant.tagline}</p>}
-                <p style={{ margin: '5px 0', fontSize: '11px' }}>--------------------------------</p>
-                <h3 style={{ margin: '0', fontSize: '14px' }}>طاولة / Table: {printData.order.table_number}</h3>
-                <p style={{ margin: '5px 0', fontSize: '11px' }}>--------------------------------</p>
+                <p style={{ margin: '5px 0', fontSize: '11px' }}>{'='.repeat(32)}</p>
+                <h3 style={{ margin: '0', fontSize: '16px', fontWeight: 'bold' }}>{isRtl ? 'طاولة' : 'Table'}: {printData.order.table_number}</h3>
+                <p style={{ margin: '5px 0', fontSize: '10px' }}>{new Date(printData.order.created_at).toLocaleString('ar-DZ')}</p>
+                <p style={{ margin: '5px 0', fontSize: '11px' }}>{'='.repeat(32)}</p>
               </div>
-              
+
               <div style={{ margin: '10px 0' }}>
                 {printData.order.order_items.map(item => (
-                  <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
-                    <span style={{ fontSize: '11px' }}>{item.menu_items?.name} x{item.quantity}</span>
-                    <span>{(parseFloat(item.price) * item.quantity).toFixed(0)} د.ج</span>
-                  </div>
-                ))}
-              </div>
-              
-              <div style={{ textAlign: 'center', marginTop: '10px' }}>
-                <p style={{ margin: '5px 0', fontSize: '11px' }}>--------------------------------</p>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '13px' }}>
-                  <span>الإجمالي / Total:</span>
-                  <span>{parseFloat(printData.order.total_price).toFixed(0)} د.ج</span>
-                </div>
-                <p style={{ margin: '5px 0', fontSize: '11px' }}>--------------------------------</p>
-                <p style={{ margin: '5px 0 0 0', fontSize: '10px' }}>شكراً لزيارتكم / Merci pour votre visite</p>
-                <p style={{ margin: '2px 0 0 0', fontSize: '9px', color: '#666' }}>{new Date(printData.order.created_at).toLocaleString('ar-DZ')}</p>
-              </div>
-            </div>
-          ) : (
-            // Kitchen Copy (Prices hidden, table number large)
-            <div className="receipt-kitchen">
-              <div style={{ textAlign: 'center', marginBottom: '8px' }}>
-                <h1 style={{ margin: '0', fontSize: '22px', border: '2px solid black', padding: '5px' }}>طاولة: {printData.order.table_number}</h1>
-                <h2 style={{ margin: '10px 0 5px 0', fontSize: '14px' }}>طلب للمطبخ / Bon Cuisine</h2>
-                <p style={{ margin: '2px 0', fontSize: '11px' }}>--------------------------------</p>
-              </div>
-              
-              <div style={{ margin: '10px 0' }}>
-                {printData.order.order_items.map(item => (
-                  <div key={item.id} style={{ marginBottom: '8px', fontSize: '13px', borderBottom: '1px dotted #ccc', paddingBottom: '4px' }}>
-                    <span style={{ fontWeight: 'bold' }}>- {item.menu_items?.name} </span>
-                    <span style={{ fontSize: '16px', fontWeight: 'bold', border: '1px solid black', padding: '0 6px', float: 'left' }}>x{item.quantity}</span>
-                    <div style={{ clear: 'both' }}></div>
+                  <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '12px' }}>
+                    <span style={{ flex: 1 }}>{item.menu_items?.name}</span>
+                    <span style={{ fontWeight: 'bold' }}>x{item.quantity}</span>
+                    <span style={{ fontWeight: 'bold' }}>{(parseFloat(item.price) * item.quantity).toFixed(0)} {t.currency}</span>
                   </div>
                 ))}
               </div>
 
               {printData.order.notes && (
-                <div style={{ margin: '10px 0', padding: '6px', border: '1px solid #000', background: '#f0f0f0' }}>
-                  <strong style={{ fontSize: '11px' }}>ملاحظات المطبخ:</strong>
-                  <p style={{ margin: '4px 0 0 0', fontSize: '13px', fontWeight: 'bold' }}>{printData.order.notes}</p>
+                <div style={{ margin: '10px 0', padding: '5px', border: '1px dashed #000', fontSize: '10px' }}>
+                  <strong>{isRtl ? 'ملاحظات:' : 'Notes:'}</strong>
+                  <p style={{ margin: '4px 0 0 0' }}>{printData.order.notes}</p>
                 </div>
               )}
-              
-              <div style={{ textAlign: 'center', marginTop: '10px' }}>
-                <p style={{ margin: '2px 0', fontSize: '11px' }}>--------------------------------</p>
-                <p style={{ margin: '2px 0 0 0', fontSize: '9px' }}>{new Date(printData.order.created_at).toLocaleTimeString('ar-DZ')}</p>
+
+              <div style={{ textAlign: 'center', marginTop: '15px' }}>
+                <p style={{ margin: '5px 0', fontSize: '11px' }}>{'='.repeat(32)}</p>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '16px', padding: '0 5px' }}>
+                  <span>{isRtl ? 'الإجمالي' : 'TOTAL'}:</span>
+                  <span>{parseFloat(printData.order.total_price).toFixed(0)} {t.currency}</span>
+                </div>
+                <p style={{ margin: '5px 0', fontSize: '11px' }}>{'='.repeat(32)}</p>
+                <p style={{ margin: '8px 0 0 0', fontSize: '11px', fontWeight: 'bold' }}>{isRtl ? 'شكراً لزيارتكم' : 'Thank you for your visit'}</p>
+                <p style={{ margin: '2px 0 0 0', fontSize: '9px', color: '#666' }}>{restaurant?.phone || ''}</p>
+              </div>
+            </div>
+          ) : (
+            // Kitchen Copy (Prices hidden, table number large)
+            <div className="receipt-kitchen">
+              <div style={{ textAlign: 'center', marginBottom: '10px' }}>
+                <h1 style={{ margin: '0', fontSize: '28px', fontWeight: 'bold', border: '3px solid black', padding: '8px 15px' }}>
+                  {isRtl ? 'طاولة' : 'TABLE'} {printData.order.table_number}
+                </h1>
+                <h2 style={{ margin: '10px 0 5px 0', fontSize: '16px', fontWeight: 'bold' }}>
+                  {isRtl ? 'طلب المطبخ' : 'KITCHEN ORDER'}
+                </h2>
+                <p style={{ margin: '5px 0', fontSize: '11px' }}>{new Date(printData.order.created_at).toLocaleTimeString('ar-DZ')}</p>
+                <p style={{ margin: '5px 0', fontSize: '11px' }}>{'='.repeat(32)}</p>
+              </div>
+
+              <div style={{ margin: '10px 0' }}>
+                {printData.order.order_items.map(item => (
+                  <div key={item.id} style={{ marginBottom: '12px', fontSize: '14px', borderBottom: '1px dashed #000', paddingBottom: '8px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontWeight: 'bold', fontSize: '15px' }}>{item.menu_items?.name}</span>
+                      <span style={{ fontSize: '20px', fontWeight: 'bold', border: '2px solid black', padding: '2px 10px', minWidth: '40px', textAlign: 'center' }}>
+                        x{item.quantity}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {printData.order.notes && (
+                <div style={{ margin: '15px 0', padding: '10px', border: '2px solid black', background: '#fff', textAlign: 'center' }}>
+                  <strong style={{ fontSize: '14px', textDecoration: 'underline' }}>
+                    {isRtl ? 'ملاحظات المطبخ' : 'KITCHEN NOTES'}
+                  </strong>
+                  <p style={{ margin: '8px 0 0 0', fontSize: '16px', fontWeight: 'bold' }}>{printData.order.notes}</p>
+                </div>
+              )}
+
+              <div style={{ textAlign: 'center', marginTop: '15px' }}>
+                <p style={{ margin: '5px 0', fontSize: '11px' }}>{'='.repeat(32)}</p>
               </div>
             </div>
           )}

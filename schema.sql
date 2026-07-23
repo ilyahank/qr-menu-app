@@ -235,4 +235,103 @@ BEFORE INSERT ON public.orders
 FOR EACH ROW
 EXECUTE FUNCTION check_restaurant_subscription();
 
+-- 10. TABLE SESSIONS FOR LOCKING
+CREATE TABLE IF NOT EXISTS public.table_sessions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    restaurant_id UUID NOT NULL REFERENCES public.restaurants(id) ON DELETE CASCADE,
+    table_number VARCHAR(50) NOT NULL,
+    session_id VARCHAR(255) NOT NULL,
+    device_info TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('Africa/Algiers'::text, now()),
+    last_activity TIMESTAMP WITH TIME ZONE DEFAULT timezone('Africa/Algiers'::text, now()),
+    is_active BOOLEAN DEFAULT true,
+    UNIQUE(restaurant_id, table_number, is_active)
+);
+
+CREATE INDEX idx_table_sessions_restaurant ON public.table_sessions(restaurant_id, is_active);
+CREATE INDEX idx_table_sessions_table ON public.table_sessions(restaurant_id, table_number);
+
+-- Function to create or update table session
+CREATE OR REPLACE FUNCTION create_or_update_table_session(
+    p_restaurant_id UUID,
+    p_table_number VARCHAR(50),
+    p_session_id VARCHAR(255),
+    p_device_info TEXT DEFAULT NULL
+)
+RETURNS VOID AS $$
+BEGIN
+    INSERT INTO public.table_sessions (restaurant_id, table_number, session_id, device_info, is_active)
+    VALUES (p_restaurant_id, p_table_number, p_session_id, p_device_info, true)
+    ON CONFLICT (restaurant_id, table_number, is_active)
+    DO UPDATE SET
+        session_id = EXCLUDED.session_id,
+        device_info = EXCLUDED.device_info,
+        last_activity = timezone('Africa/Algiers'::text, now());
+END;
+$$ LANGUAGE plpgsql;
+
+-- Function to check if table is locked
+CREATE OR REPLACE FUNCTION is_table_locked(
+    p_restaurant_id UUID,
+    p_table_number VARCHAR(50),
+    p_session_id VARCHAR(255)
+)
+RETURNS BOOLEAN AS $$
+DECLARE
+    is_locked BOOLEAN;
+BEGIN
+    SELECT EXISTS(
+        SELECT 1 FROM public.table_sessions
+        WHERE restaurant_id = p_restaurant_id
+        AND table_number = p_table_number
+        AND is_active = true
+        AND session_id != p_session_id
+        AND last_activity > timezone('Africa/Algiers'::text, now()) - INTERVAL '30 minutes'
+    ) INTO is_locked;
+
+    RETURN is_locked;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Function to unlock table (by staff)
+CREATE OR REPLACE FUNCTION unlock_table(
+    p_restaurant_id UUID,
+    p_table_number VARCHAR(50)
+)
+RETURNS VOID AS $$
+BEGIN
+    UPDATE public.table_sessions
+    SET is_active = false
+    WHERE restaurant_id = p_restaurant_id
+    AND table_number = p_table_number
+    AND is_active = true;
+END;
+$$ LANGUAGE plpgsql;
+
+-- 11. RESTAURANT TABLES MANAGEMENT
+CREATE TABLE IF NOT EXISTS public.restaurant_tables (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    restaurant_id UUID NOT NULL REFERENCES public.restaurants(id) ON DELETE CASCADE,
+    table_number VARCHAR(50) NOT NULL,
+    table_name VARCHAR(100),
+    qr_code_url VARCHAR(512),
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('Africa/Algiers'::text, now()),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('Africa/Algiers'::text, now()),
+    UNIQUE(restaurant_id, table_number)
+);
+
+CREATE INDEX idx_restaurant_tables_restaurant ON public.restaurant_tables(restaurant_id, is_active);
+
+-- 12. TAKEAWAY QR CODES
+CREATE TABLE IF NOT EXISTS public.takeaway_qr_codes (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    restaurant_id UUID NOT NULL REFERENCES public.restaurants(id) ON DELETE CASCADE,
+    qr_code_url VARCHAR(512) NOT NULL,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('Africa/Algiers'::text, now()),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('Africa/Algiers'::text, now())
+);
+
+CREATE INDEX idx_takeaway_qr_restaurant ON public.takeaway_qr_codes(restaurant_id, is_active);
 

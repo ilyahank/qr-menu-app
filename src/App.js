@@ -19,6 +19,7 @@ import Settings from './pages/Settings';
 import QRCodePage from './pages/QRCodePage';
 import OrdersManagement from './pages/OrdersManagement';
 import Analytics from './pages/Analytics';
+import TablesManagement from './pages/TablesManagement';
 
 import './App.css';
 import { useAuth } from './contexts/AuthContext';
@@ -165,6 +166,7 @@ function App() {
             <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
             <Route path="/dashboard/menu" element={<PrivateRoute><MenuManagement /></PrivateRoute>} />
             <Route path="/dashboard/categories" element={<PrivateRoute><CategoriesManagement /></PrivateRoute>} />
+            <Route path="/dashboard/tables" element={<PrivateRoute><TablesManagement /></PrivateRoute>} />
             <Route path="/dashboard/settings" element={<PrivateRoute><Settings /></PrivateRoute>} />
             <Route path="/dashboard/qr-code" element={<PrivateRoute><QRCodePage /></PrivateRoute>} />
             <Route path="/dashboard/orders" element={<PrivateRoute><OrdersManagement /></PrivateRoute>} />

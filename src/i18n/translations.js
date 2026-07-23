@@ -195,6 +195,9 @@ export const translations = {
     downloadPdf: 'تنزيل PDF',
     archiveAlertTitle: 'أرشفة وتصفير البيانات الحية',
     archiveAlertMessage: 'تنبيه إجباري: لبدء تصفح ومتابعة بيانات الشهر الجديد، يجب تنزيل تقرير الشهر الماضي أولاً. سيؤدي هذا لتخزين التقرير بـ PDF دائم وتصفير الطلبات التفصيلية الحية للحفاظ على سرعة وأداء النظام.',
+
+    // Table Locking
+    tableLocked: 'هذه الطاولة مستخدمة حالياً. يرجى طلب المساعدة من النادل.',
   },
   fr: {
     dir: 'ltr',
@@ -383,6 +386,9 @@ export const translations = {
     downloadPdf: 'Télécharger PDF',
     archiveAlertTitle: 'Archivage et réinitialisation des données',
     archiveAlertMessage: 'Avertissement obligatoire: Avant de pouvoir suivre les données du nouveau mois, vous devez télécharger le rapport du mois précédent. Cela générera un PDF permanent et réinitialisera les données de ventes détaillées pour maintenir les performances du système.',
+
+    // Table Locking
+    tableLocked: 'Cette table est actuellement utilisée. Veuillez demander de l\'aide au personnel.',
   },
   en: {
     dir: 'ltr',
@@ -571,5 +577,8 @@ export const translations = {
     downloadPdf: 'Download PDF',
     archiveAlertTitle: 'Archive & Clear Sales Data',
     archiveAlertMessage: 'Required notice: Before viewing data for the new month, you must download the report for the previous month. This creates a permanent PDF and resets detailed orders to keep database performance optimal.',
+
+    // Table Locking
+    tableLocked: 'This table is currently in use. Please ask staff for assistance.',
   }
 };

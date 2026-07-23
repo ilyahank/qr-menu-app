@@ -3,6 +3,37 @@
   background: #f5f7fa;
 }
 
+.qr-tabs {
+  display: flex;
+  gap: 15px;
+  margin-bottom: 30px;
+  justify-content: center;
+}
+
+.tab-btn {
+  padding: 12px 30px;
+  background: white;
+  border: 2px solid #e5e7eb;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  color: #374151;
+}
+
+.tab-btn:hover {
+  border-color: #4f46e5;
+  color: #4f46e5;
+}
+
+.tab-btn.active {
+  background: #4f46e5;
+  border-color: #4f46e5;
+  color: white;
+}
+
+
 .qr-content {
   max-width: 1200px;
   margin: 0 auto;

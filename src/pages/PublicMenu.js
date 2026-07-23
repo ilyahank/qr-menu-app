@@ -23,6 +23,61 @@ export default function PublicMenu() {
   const [orderSuccess, setOrderSuccess] = useState(false);
   const [submitError, setSubmitError] = useState('');
 
+  // Session State
+  const [sessionId, setSessionId] = useState('');
+  const [tableLocked, setTableLocked] = useState(false);
+  const [sessionInitialized, setSessionInitialized] = useState(false);
+
+  // Initialize session on mount
+  useEffect(() => {
+    const existingSession = localStorage.getItem(`session_${restaurantId}`);
+    if (existingSession) {
+      setSessionId(existingSession);
+    } else {
+      const newSession = crypto.randomUUID();
+      setSessionId(newSession);
+      localStorage.setItem(`session_${restaurantId}`, newSession);
+    }
+  }, [restaurantId]);
+
+  // Check table lock when table number is entered
+  const checkTableLock = async (tableNum) => {
+    if (!tableNum || !sessionId) return false;
+
+    try {
+      const { data, error } = await supabase.rpc('is_table_locked', {
+        p_restaurant_id: restaurantId,
+        p_table_number: tableNum,
+        p_session_id: sessionId
+      });
+
+      if (error) throw error;
+      return data;
+    } catch (err) {
+      console.error('Error checking table lock:', err);
+      return false;
+    }
+  };
+
+  // Create/update session when table is selected
+  const createSession = async (tableNum) => {
+    if (!tableNum || !sessionId) return;
+
+    try {
+      const deviceInfo = navigator.userAgent;
+      const { error } = await supabase.rpc('create_or_update_table_session', {
+        p_restaurant_id: restaurantId,
+        p_table_number: tableNum,
+        p_session_id: sessionId,
+        p_device_info: deviceInfo
+      });
+
+      if (error) throw error;
+    } catch (err) {
+      console.error('Error creating session:', err);
+    }
+  };
+
   useEffect(() => {
     const fetchMenuData = async () => {
       try {
@@ -141,6 +196,17 @@ export default function PublicMenu() {
     setSubmitError('');
 
     try {
+      // Check if table is locked by another session
+      const isLocked = await checkTableLock(tableNumber.trim());
+      if (isLocked) {
+        setSubmitError(t.dir === 'rtl' ? 'هذه الطاولة مستخدمة حالياً. يرجى طلب المساعدة من النادل.' : 'This table is currently in use. Please ask staff for assistance.');
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Create/update session for this table
+      await createSession(tableNumber.trim());
+
       const totalPrice = getCartTotal();
 
       // 1. Insert order record
