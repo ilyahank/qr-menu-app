@@ -25,8 +25,6 @@ export default function PublicMenu() {
 
   // Session State
   const [sessionId, setSessionId] = useState('');
-  const [tableLocked, setTableLocked] = useState(false);
-  const [sessionInitialized, setSessionInitialized] = useState(false);
 
   // Initialize session on mount
   useEffect(() => {
