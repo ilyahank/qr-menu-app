@@ -99,6 +99,7 @@ export default function OrdersManagement() {
     return () => {
       supabase.removeChannel(channel);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [restaurantId]);
 
   const updateOrderStatus = async (orderId, newStatus) => {
@@ -136,7 +137,7 @@ export default function OrdersManagement() {
   const handlePrint = async (order, type) => {
     try {
       // 1. Check if print job already exists
-      const { data: existingJob, error: jobError } = await supabase
+      const { data: existingJob } = await supabase
         .from('print_jobs')
         .select('*')
         .eq('order_id', order.id)
