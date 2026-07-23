@@ -15,6 +15,9 @@ export default function QRCodePage() {
   const [qrUrl, setQrUrl] = useState('');
   const [takeawayQrUrl, setTakeawayQrUrl] = useState('');
   const [activeTab, setActiveTab] = useState('general'); // 'general' or 'takeaway'
+  const [dineInNote, setDineInNote] = useState('');
+  const [deliveryNote, setDeliveryNote] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     const fetchRestaurant = async () => {
@@ -27,11 +30,35 @@ export default function QRCodePage() {
           setRestaurant(restaurantData);
           setQrUrl(`${window.location.origin}/r/${restaurantData.id}`);
           setTakeawayQrUrl(`${window.location.origin}/r/${restaurantData.id}?takeaway=true`);
+          setDineInNote(restaurantData.dine_in_note || '');
+          setDeliveryNote(restaurantData.delivery_note || '');
         }
       } catch (error) { console.error(error); }
     };
     fetchRestaurant();
   }, [currentUser]);
+
+  const saveNotes = async () => {
+    if (!restaurant) return;
+    setIsSaving(true);
+    try {
+      const { error } = await supabase
+        .from('restaurants')
+        .update({
+          dine_in_note: dineInNote,
+          delivery_note: deliveryNote
+        })
+        .eq('id', restaurant.id);
+      
+      if (error) throw error;
+      alert(t.dir === 'rtl' ? 'تم حفظ الملاحظات بنجاح' : 'Notes saved successfully');
+    } catch (error) {
+      console.error(error);
+      alert(t.dir === 'rtl' ? 'فشل حفظ الملاحظات' : 'Failed to save notes');
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   const downloadQR = (type) => {
     const canvasId = type === 'takeaway' ? 'qr-code-takeaway' : 'qr-code';
@@ -92,6 +119,16 @@ export default function QRCodePage() {
                 <button onClick={() => downloadQR('general')} className="download-btn">{t.downloadQR}</button>
                 <div className="qr-url"><p>{t.qrUrl}</p><code>{qrUrl}</code></div>
               </div>
+              <div className="qr-note-section">
+                <h3>{t.dir === 'rtl' ? 'ملاحظة للطباعة' : 'Print Note'}</h3>
+                <textarea
+                  value={dineInNote}
+                  onChange={(e) => setDineInNote(e.target.value)}
+                  placeholder={t.dir === 'rtl' ? 'اكتب ملاحظة صغيرة للطباعة بجانب رمز QR...' : 'Write a small note to print next to the QR code...'}
+                  rows="2"
+                  className="qr-note-input"
+                />
+              </div>
               <div className="qr-instructions">
                 <h3>{t.howToUse}</h3>
                 <ol>
@@ -111,6 +148,16 @@ export default function QRCodePage() {
               <div className="qr-actions">
                 <button onClick={() => downloadQR('takeaway')} className="download-btn">{t.downloadQR}</button>
                 <div className="qr-url"><p>{t.qrUrl}</p><code>{takeawayQrUrl}</code></div>
+              </div>
+              <div className="qr-note-section">
+                <h3>{t.dir === 'rtl' ? 'ملاحظة للطباعة' : 'Print Note'}</h3>
+                <textarea
+                  value={deliveryNote}
+                  onChange={(e) => setDeliveryNote(e.target.value)}
+                  placeholder={t.dir === 'rtl' ? 'اكتب ملاحظة صغيرة للطباعة بجانب رمز QR...' : 'Write a small note to print next to the QR code...'}
+                  rows="2"
+                  className="qr-note-input"
+                />
               </div>
               <div className="qr-instructions">
                 <h3>{t.dir === 'rtl' ? 'كيفية الاستخدام للتوصيل:' : 'How to use for Takeaway:'}</h3>
@@ -133,6 +180,9 @@ export default function QRCodePage() {
                 <li>{t.tip4}</li>
               </ul>
             </div>
+            <button onClick={saveNotes} className="save-notes-btn" disabled={isSaving}>
+              {isSaving ? (t.dir === 'rtl' ? 'جاري الحفظ...' : 'Saving...') : (t.dir === 'rtl' ? 'حفظ الملاحظات' : 'Save Notes')}
+            </button>
           </div>
         </div>
       </div>

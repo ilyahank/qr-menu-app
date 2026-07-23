@@ -14,6 +14,7 @@ export default function PublicMenu() {
   const [error, setError] = useState(null);
   const [activeCategory, setActiveCategory] = useState('all');
   const { t } = useLanguage();
+  const [isTakeaway, setIsTakeaway] = useState(false);
 
   // Cart State
   const [cart, setCart] = useState([]);
@@ -27,11 +28,15 @@ export default function PublicMenu() {
   // Session State
   const [sessionId, setSessionId] = useState('');
 
-  // Get table number from URL query parameter on mount
+  // Get table number and takeaway mode from URL query parameter on mount
   useEffect(() => {
     const tableParam = searchParams.get('table');
+    const takeawayParam = searchParams.get('takeaway');
     if (tableParam) {
       setTableNumber(tableParam);
+    }
+    if (takeawayParam === 'true') {
+      setIsTakeaway(true);
     }
   }, [searchParams]);
 
@@ -346,7 +351,27 @@ export default function PublicMenu() {
         </div>
         <h1 className="restaurant-name">{restaurant.name}</h1>
         {restaurant.tagline && <p className="restaurant-tagline">{restaurant.tagline}</p>}
+        {isTakeaway && restaurant.delivery_note && (
+          <div className="delivery-note-banner">
+            <p>{restaurant.delivery_note}</p>
+          </div>
+        )}
       </header>
+
+      {isTakeaway && restaurant.phone && (
+        <div className="phone-call-banner">
+          <div className="phone-call-content">
+            <div className="phone-icon">📞</div>
+            <div className="phone-info">
+              <h3>{isRtl ? 'اتصل للطلب' : 'Call to Order'}</h3>
+              <p className="phone-number">{restaurant.phone}</p>
+            </div>
+            <button onClick={callPhone} className="call-btn">
+              {isRtl ? 'اتصل الآن' : 'Call Now'}
+            </button>
+          </div>
+        </div>
+      )}
 
       {visibleCategories.length > 0 && (
         <div className="category-filters">
@@ -379,9 +404,11 @@ export default function PublicMenu() {
                         {item.description && <p className="item-description">{item.description}</p>}
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '10px' }}>
                           <span className="item-price">{parseFloat(item.price).toFixed(0)} {t.currency}</span>
-                          <button onClick={() => addToCart(item)} className="add-to-cart-btn">
-                            + {t.addToCart}
-                          </button>
+                          {!isTakeaway && (
+                            <button onClick={() => addToCart(item)} className="add-to-cart-btn">
+                              + {t.addToCart}
+                            </button>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -393,8 +420,8 @@ export default function PublicMenu() {
         {filteredItems.length === 0 && <div className="empty-menu"><p>{t.noMenuItems}</p></div>}
       </div>
 
-      {/* FLOATING CART BAR */}
-      {cart.length > 0 && (
+      {/* FLOATING CART BAR - Only show for dine-in mode */}
+      {cart.length > 0 && !isTakeaway && (
         <div className="floating-cart-bar" onClick={() => setShowCart(true)}>
           <div className="cart-bar-content">
             <span className="cart-badge">{getCartCount()}</span>

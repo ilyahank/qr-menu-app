@@ -89,6 +89,9 @@ export default function Analytics() {
     try {
       const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Algiers' }); // YYYY-MM-DD
       const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toLocaleDateString('en-CA', { timeZone: 'Africa/Algiers' });
+      const startOfMonthTime = new Date();
+      startOfMonthTime.setDate(1);
+      startOfMonthTime.setHours(0,0,0,0);
       
       // 1. Fetch Today's Stats from daily_sales_summary
       const { data: todayStats } = await supabase
@@ -105,7 +108,24 @@ export default function Analytics() {
           avgValue: parseFloat(todayStats.avg_order_value) || 0
         });
       } else {
-        setStats({ todayRevenue: 0, todayOrders: 0, avgValue: 0 });
+        // Fallback: Calculate from raw orders if summary is empty
+        const { data: todayOrders } = await supabase
+          .from('orders')
+          .select('total_price')
+          .eq('restaurant_id', selectedRestId)
+          .eq('status', 'completed')
+          .gte('created_at', new Date(todayStr).toISOString());
+        
+        if (todayOrders && todayOrders.length > 0) {
+          const totalRev = todayOrders.reduce((sum, o) => sum + parseFloat(o.total_price), 0);
+          setStats({
+            todayRevenue: totalRev,
+            todayOrders: todayOrders.length,
+            avgValue: totalRev / todayOrders.length
+          });
+        } else {
+          setStats({ todayRevenue: 0, todayOrders: 0, avgValue: 0 });
+        }
       }
 
       // 2. Fetch Daily Sales for current month
@@ -116,15 +136,43 @@ export default function Analytics() {
         .gte('date', startOfMonth)
         .order('date', { ascending: true });
 
-      const formattedDaily = (dailySales || []).map(row => {
-        // format date string (e.g. 2026-07-22 to 22)
-        const day = row.date.split('-')[2];
-        return {
-          name: day,
-          revenue: parseFloat(row.total_revenue) || 0,
-          orders: row.total_orders || 0
-        };
-      });
+      let formattedDaily = [];
+      if (dailySales && dailySales.length > 0) {
+        formattedDaily = dailySales.map(row => {
+          const day = row.date.split('-')[2];
+          return {
+            name: day,
+            revenue: parseFloat(row.total_revenue) || 0,
+            orders: row.total_orders || 0
+          };
+        });
+      } else {
+        // Fallback: Calculate from raw orders
+        const { data: monthOrders } = await supabase
+          .from('orders')
+          .select('created_at, total_price')
+          .eq('restaurant_id', selectedRestId)
+          .eq('status', 'completed')
+          .gte('created_at', startOfMonthTime.toISOString());
+        
+        if (monthOrders) {
+          const dailyMap = {};
+          monthOrders.forEach(order => {
+            const day = new Date(order.created_at).getDate();
+            if (!dailyMap[day]) {
+              dailyMap[day] = { revenue: 0, orders: 0 };
+            }
+            dailyMap[day].revenue += parseFloat(order.total_price);
+            dailyMap[day].orders += 1;
+          });
+          
+          formattedDaily = Object.keys(dailyMap).map(day => ({
+            name: day,
+            revenue: dailyMap[day].revenue,
+            orders: dailyMap[day].orders
+          })).sort((a, b) => parseInt(a.name) - parseInt(b.name));
+        }
+      }
       setDailySalesData(formattedDaily);
 
       // 3. Fetch Yearly Performance from monthly_totals
@@ -137,18 +185,49 @@ export default function Analytics() {
         .order('month', { ascending: true });
 
       const monthNamesFr = ["", "Jan", "Fév", "Mar", "Avr", "Mai", "Jui", "Jyl", "Aoû", "Sep", "Oct", "Nov", "Déc"];
-      const formattedYearly = (yearlyTotals || []).map(row => ({
-        name: monthNamesFr[row.month] || String(row.month),
-        revenue: parseFloat(row.total_revenue) || 0,
-        orders: row.total_orders || 0
-      }));
+      let formattedYearly = [];
+      
+      if (yearlyTotals && yearlyTotals.length > 0) {
+        formattedYearly = yearlyTotals.map(row => ({
+          name: monthNamesFr[row.month] || String(row.month),
+          revenue: parseFloat(row.total_revenue) || 0,
+          orders: row.total_orders || 0
+        }));
+      } else {
+        // Fallback: Calculate from raw orders for current year
+        const yearStart = new Date(currentYear, 0, 1).toISOString();
+        const { data: yearOrders } = await supabase
+          .from('orders')
+          .select('created_at, total_price')
+          .eq('restaurant_id', selectedRestId)
+          .eq('status', 'completed')
+          .gte('created_at', yearStart);
+        
+        if (yearOrders) {
+          const monthlyMap = {};
+          yearOrders.forEach(order => {
+            const month = new Date(order.created_at).getMonth() + 1;
+            if (!monthlyMap[month]) {
+              monthlyMap[month] = { revenue: 0, orders: 0 };
+            }
+            monthlyMap[month].revenue += parseFloat(order.total_price);
+            monthlyMap[month].orders += 1;
+          });
+          
+          formattedYearly = Object.keys(monthlyMap).map(month => ({
+            name: monthNamesFr[month] || String(month),
+            revenue: monthlyMap[month].revenue,
+            orders: monthlyMap[month].orders
+          })).sort((a, b) => {
+            const monthIndex = monthNamesFr.indexOf(a.name);
+            const monthIndexB = monthNamesFr.indexOf(b.name);
+            return monthIndex - monthIndexB;
+          });
+        }
+      }
       setYearlySalesData(formattedYearly);
 
       // 4. Fetch Top Selling Items of the current month from raw orders
-      const startOfMonthTime = new Date();
-      startOfMonthTime.setDate(1);
-      startOfMonthTime.setHours(0,0,0,0);
-      
       const { data: orderItemsData, error: itemsError } = await supabase
         .from('order_items')
         .select(`
