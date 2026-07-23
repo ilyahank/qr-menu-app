@@ -19,7 +19,7 @@ import Settings from './pages/Settings';
 import QRCodePage from './pages/QRCodePage';
 import OrdersManagement from './pages/OrdersManagement';
 import Analytics from './pages/Analytics';
-import TablesManagement from './pages/TablesManagement';
+
 
 import './App.css';
 import { useAuth } from './contexts/AuthContext';
