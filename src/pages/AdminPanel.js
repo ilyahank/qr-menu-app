@@ -33,7 +33,7 @@ export default function AdminPanel() {
     tagline: '', 
     color: '#667eea',
     sub_start_date: new Date().toISOString().split('T')[0],
-    sub_duration: '30' // 30, 90, 365, custom
+    sub_duration: '14' // 14, 30, 90, 365, custom
   });
   const [customDays, setCustomDays] = useState('');
   const [loading, setLoading] = useState(false);
@@ -42,7 +42,7 @@ export default function AdminPanel() {
   // Subscription Extension Modal State
   const [showExtendModal, setShowExtendModal] = useState(false);
   const [selectedRestForSub, setSelectedRestForSub] = useState(null);
-  const [extendDuration, setExtendDuration] = useState('30'); // 30, 90, 365, custom
+  const [extendDuration, setExtendDuration] = useState('14'); // 14, 30, 90, 365, custom
   const [extendCustomDays, setExtendCustomDays] = useState('');
   const [extendNotes, setExtendNotes] = useState('');
 
@@ -235,7 +235,7 @@ export default function AdminPanel() {
         tagline: '', 
         color: '#667eea',
         sub_start_date: new Date().toISOString().split('T')[0],
-        sub_duration: '30'
+        sub_duration: '14'
       });
       setCustomDays('');
       setShowForm(false);
@@ -294,7 +294,7 @@ export default function AdminPanel() {
       alert('✅ Subscription extended successfully!');
       setShowExtendModal(false);
       setSelectedRestForSub(null);
-      setExtendDuration('30');
+      setExtendDuration('14');
       setExtendCustomDays('');
       setExtendNotes('');
       await fetchRestaurants();
@@ -627,6 +627,7 @@ export default function AdminPanel() {
                 <div className="form-group">
                   <label>مدة الاشتراك</label>
                   <select name="sub_duration" value={formData.sub_duration} onChange={handleInputChange} className="search-input" style={{ width: '100%', boxSizing: 'border-box' }}>
+                    <option value="14">14 يوم</option>
                     <option value="30">30 يوم (شهر)</option>
                     <option value="90">90 يوم (3 أشهر)</option>
                     <option value="365">365 يوم (سنة كاملة)</option>
@@ -677,6 +678,7 @@ export default function AdminPanel() {
                     className="search-input" 
                     style={{ width: '100%', boxSizing: 'border-box' }}
                   >
+                    <option value="14">14 يوم</option>
                     <option value="30">30 يوم (شهر)</option>
                     <option value="90">90 يوم (3 أشهر)</option>
                     <option value="365">365 يوم (سنة)</option>
@@ -878,7 +880,7 @@ export default function AdminPanel() {
                           لوحة التحكم المالك
                         </button>
                         <button 
-                          onClick={() => { setSelectedRestForSub(restaurant); setExtendDuration('30'); setShowExtendModal(true); }}
+                          onClick={() => { setSelectedRestForSub(restaurant); setExtendDuration('14'); setShowExtendModal(true); }}
                           className="submit-btn" 
                           style={{ padding: '5px 10px', fontSize: '12px', backgroundColor: '#10b981' }}
                         >
