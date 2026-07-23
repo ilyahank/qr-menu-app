@@ -86,7 +86,16 @@ export default function TablesManagement() {
       setShowAddModal(false);
     } catch (error) {
       console.error(error);
-      alert(isRtl ? 'فشل إضافة الطاولة' : 'Failed to add table');
+      let errorMessage = error.message || (isRtl ? 'فشل إضافة الطاولة' : 'Failed to add table');
+      
+      // Provide user-friendly message for duplicate table number
+      if (error.code === '23505' || errorMessage.includes('duplicate key') || errorMessage.includes('unique constraint')) {
+        errorMessage = isRtl 
+          ? 'رقم الطاولة موجود بالفعل. يرجى استخدام رقم مختلف.' 
+          : 'Table number already exists. Please use a different number.';
+      }
+      
+      alert(errorMessage);
     } finally {
       setIsAdding(false);
     }
@@ -106,7 +115,8 @@ export default function TablesManagement() {
       setTables(tables.filter(t => t.id !== tableId));
     } catch (error) {
       console.error(error);
-      alert(isRtl ? 'فشل حذف الطاولة' : 'Failed to delete table');
+      const errorMessage = error.message || (isRtl ? 'فشل حذف الطاولة' : 'Failed to delete table');
+      alert(errorMessage);
     }
   };
 
