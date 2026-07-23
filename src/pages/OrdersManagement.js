@@ -13,6 +13,7 @@ export default function OrdersManagement() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [restaurantId, setRestaurantId] = useState(null);
+  const [statusFilter, setStatusFilter] = useState('all');
 
   // Print state for rendering hidden receipt
   const [printData, setPrintData] = useState(null);
@@ -133,6 +134,42 @@ export default function OrdersManagement() {
     }
   };
 
+  const deleteOrder = async (orderId) => {
+    if (!window.confirm(t.dir === 'rtl' ? 'هل أنت متأكد من حذف هذا الطلب؟' : 'Are you sure you want to delete this order?')) return;
+
+    try {
+      const { error } = await supabase
+        .from('orders')
+        .delete()
+        .eq('id', orderId);
+
+      if (error) throw error;
+      
+      // Remove from in-memory state
+      setOrders(orders.filter(o => o.id !== orderId));
+    } catch (error) {
+      setPrintErrorMsg(t.dir === 'rtl' ? 'فشل حذف الطلب: ' + error.message : 'Error deleting order: ' + error.message);
+      setTimeout(() => setPrintErrorMsg(''), 6000);
+    }
+  };
+
+  const unlockTable = async (tableNumber) => {
+    try {
+      const { error } = await supabase.rpc('unlock_table', {
+        p_restaurant_id: restaurantId,
+        p_table_number: tableNumber
+      });
+
+      if (error) throw error;
+      
+      setPrintErrorMsg(t.dir === 'rtl' ? 'تم فتح الطاولة بنجاح' : 'Table unlocked successfully');
+      setTimeout(() => setPrintErrorMsg(''), 3000);
+    } catch (error) {
+      setPrintErrorMsg(t.dir === 'rtl' ? 'فشل فتح الطاولة: ' + error.message : 'Error unlocking table: ' + error.message);
+      setTimeout(() => setPrintErrorMsg(''), 6000);
+    }
+  };
+
   // Browser Print handler
   const handlePrint = async (order, type) => {
     try {
@@ -233,9 +270,36 @@ export default function OrdersManagement() {
           {restaurant && <div className="restaurant-info"><h2>{restaurant.name}</h2></div>}
         </header>
 
+        <div className="orders-filters">
+          <button 
+            className={`filter-btn ${statusFilter === 'all' ? 'active' : ''}`}
+            onClick={() => setStatusFilter('all')}
+          >
+            {t.dir === 'rtl' ? 'الكل' : 'All'}
+          </button>
+          <button 
+            className={`filter-btn ${statusFilter === 'pending' ? 'active' : ''}`}
+            onClick={() => setStatusFilter('pending')}
+          >
+            {t.statusPending}
+          </button>
+          <button 
+            className={`filter-btn ${statusFilter === 'confirmed' ? 'active' : ''}`}
+            onClick={() => setStatusFilter('confirmed')}
+          >
+            {t.statusConfirmed}
+          </button>
+          <button 
+            className={`filter-btn ${statusFilter === 'completed' ? 'active' : ''}`}
+            onClick={() => setStatusFilter('completed')}
+          >
+            {t.statusCompleted}
+          </button>
+        </div>
+
         <div className="orders-grid">
           {orders.length > 0 ? (
-            orders.map(order => (
+            orders.filter(order => statusFilter === 'all' || order.status === statusFilter).map(order => (
               <div key={order.id} className={`order-card status-${order.status}`}>
                 <div className="order-card-header">
                   <span className="table-badge">{t.tableNumber}: {order.table_number}</span>
@@ -294,6 +358,16 @@ export default function OrdersManagement() {
                       </button>
                     </>
                   )}
+                  
+                  {/* Delete order button */}
+                  <button onClick={() => deleteOrder(order.id)} className="action-btn delete-btn">
+                    {t.delete}
+                  </button>
+
+                  {/* Unlock table button */}
+                  <button onClick={() => unlockTable(order.table_number)} className="action-btn unlock-btn">
+                    {t.dir === 'rtl' ? 'فتح الطاولة' : 'Unlock Table'}
+                  </button>
                   
                   {/* PRINTING SHORTCUTS */}
                   {(order.status === 'confirmed' || order.status === 'completed') && (
