@@ -54,9 +54,9 @@ export default function TablesManagement() {
     fetchData();
   }, [currentUser]);
 
-  const generateQRUrl = (tableId) => {
+  const generateQRUrl = (tableNumber) => {
     const baseUrl = window.location.origin;
-    return `${baseUrl}/r/${restaurant.id}?table=${tableId}`;
+    return `${baseUrl}/r/${restaurant.id}?table=${tableNumber}`;
   };
 
   const handleAddTable = async (e) => {
@@ -179,7 +179,7 @@ export default function TablesManagement() {
                   <div className="qr-container">
                     <QRCode
                       id={`qr-${table.id}`}
-                      value={generateQRUrl(table.id)}
+                      value={generateQRUrl(table.table_number)}
                       size={150}
                       level="H"
                     />
