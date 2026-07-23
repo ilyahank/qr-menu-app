@@ -93,7 +93,7 @@ export default function TablesManagement() {
   };
 
   const handleDeleteTable = async (tableId) => {
-    if (!confirm(isRtl ? 'هل أنت متأكد من حذف هذه الطاولة؟' : 'Are you sure you want to delete this table?')) return;
+    if (!window.confirm(isRtl ? 'هل أنت متأكد من حذف هذه الطاولة؟' : 'Are you sure you want to delete this table?')) return;
 
     try {
       const { error } = await supabase
