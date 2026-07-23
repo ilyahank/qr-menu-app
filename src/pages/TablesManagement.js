@@ -3,11 +3,13 @@ import { supabase } from '../supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import QRCode from 'qrcode.react';
+import MobileDrawer from '../components/MobileDrawer';
 import './TablesManagement.css';
 
 export default function TablesManagement() {
-  const { currentUser } = useAuth();
+  const { currentUser, signOut, userRole } = useAuth();
   const { t } = useLanguage();
+  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const [restaurant, setRestaurant] = useState(null);
   const [tables, setTables] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -142,7 +144,10 @@ export default function TablesManagement() {
   return (
     <div className="tables-management" style={{ direction: t?.dir }}>
       <nav className="dashboard-nav">
-        <div className="nav-brand"><h2>QR Menu</h2></div>
+        <div className="nav-brand">
+          <button className="mobile-menu-btn" onClick={() => setMobileDrawerOpen(true)}>☰</button>
+          <h2>QR Menu</h2>
+        </div>
         <div className="nav-links">
           <a href="/dashboard" className="nav-link">{t?.dashboard || 'Dashboard'}</a>
           <a href="/dashboard/orders" className="nav-link">{t?.orders || 'Orders'}</a>
@@ -154,6 +159,13 @@ export default function TablesManagement() {
           <a href="/dashboard/settings" className="nav-link">{t?.settings || 'Settings'}</a>
         </div>
       </nav>
+
+      <MobileDrawer 
+        isOpen={mobileDrawerOpen} 
+        onClose={() => setMobileDrawerOpen(false)} 
+        onLogout={signOut}
+        userRole={userRole}
+      />
 
       <div className="dashboard-content">
         <header className="dashboard-header">

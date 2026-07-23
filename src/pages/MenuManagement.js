@@ -4,11 +4,13 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { supabase } from '../supabase';
 import { Link } from 'react-router-dom';
 import LangSwitcher from '../components/LangSwitcher';
+import MobileDrawer from '../components/MobileDrawer';
 import './MenuManagement.css';
 
 export default function MenuManagement() {
-  const { currentUser, signOut } = useAuth();
+  const { currentUser, signOut, userRole } = useAuth();
   const { t } = useLanguage();
+  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const [menuItems, setMenuItems] = useState([]);
   const [categories, setCategories] = useState([]);
   const [restaurantId, setRestaurantId] = useState(null);
@@ -94,7 +96,10 @@ export default function MenuManagement() {
   return (
     <div className="menu-management">
       <nav className="dashboard-nav">
-        <div className="nav-brand"><h2>QR Menu</h2></div>
+        <div className="nav-brand">
+          <button className="mobile-menu-btn" onClick={() => setMobileDrawerOpen(true)}>☰</button>
+          <h2>QR Menu</h2>
+        </div>
         <div className="nav-links">
           <Link to="/dashboard" className="nav-link">{t.dashboard}</Link>
           <Link to="/dashboard/menu" className="nav-link active">{t.menu}</Link>
@@ -106,6 +111,13 @@ export default function MenuManagement() {
           <button onClick={signOut} className="logout-btn">{t.logout}</button>
         </div>
       </nav>
+
+      <MobileDrawer 
+        isOpen={mobileDrawerOpen} 
+        onClose={() => setMobileDrawerOpen(false)} 
+        onLogout={signOut}
+        userRole={userRole}
+      />
       <div className="menu-content">
         <div className="menu-header">
           <h1>{t.menuItemsTitle}</h1>

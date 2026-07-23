@@ -4,6 +4,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { supabase } from '../supabase';
 import { Link } from 'react-router-dom';
 import LangSwitcher from '../components/LangSwitcher';
+import MobileDrawer from '../components/MobileDrawer';
 import {
   LineChart,
   Line,
@@ -26,6 +27,7 @@ const COLORS = ['#4f46e5', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'
 export default function Analytics() {
   const { currentUser, signOut, userRole } = useAuth();
   const { t } = useLanguage();
+  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
 
   const [restaurants, setRestaurants] = useState([]);
   const [selectedRestId, setSelectedRestId] = useState('');
@@ -272,7 +274,10 @@ export default function Analytics() {
   return (
     <div className="dashboard-container" style={{ direction: t.dir }}>
       <nav className="dashboard-nav">
-        <div className="nav-brand"><h2>QR Menu</h2></div>
+        <div className="nav-brand">
+          <button className="mobile-menu-btn" onClick={() => setMobileDrawerOpen(true)}>☰</button>
+          <h2>QR Menu</h2>
+        </div>
         <div className="nav-links">
           {userRole === 'admin' ? (
             <>
@@ -294,6 +299,13 @@ export default function Analytics() {
           <button onClick={signOut} className="logout-btn">{t.logout}</button>
         </div>
       </nav>
+
+      <MobileDrawer 
+        isOpen={mobileDrawerOpen} 
+        onClose={() => setMobileDrawerOpen(false)} 
+        onLogout={signOut}
+        userRole={userRole}
+      />
 
       <div className="dashboard-content">
         <header className="dashboard-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '15px' }}>

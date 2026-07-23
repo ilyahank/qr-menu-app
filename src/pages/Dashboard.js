@@ -4,11 +4,13 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { supabase } from '../supabase';
 import { Link } from 'react-router-dom';
 import LangSwitcher from '../components/LangSwitcher';
+import MobileDrawer from '../components/MobileDrawer';
 import './Dashboard.css';
 
 export default function Dashboard() {
-  const { currentUser, signOut } = useAuth();
+  const { currentUser, signOut, userRole } = useAuth();
   const { t } = useLanguage();
+  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   
   const [restaurant, setRestaurant] = useState(null);
   const [restaurantId, setRestaurantId] = useState(null);
@@ -222,7 +224,10 @@ export default function Dashboard() {
       )}
 
       <nav className="dashboard-nav">
-        <div className="nav-brand"><h2>QR Menu</h2></div>
+        <div className="nav-brand">
+          <button className="mobile-menu-btn" onClick={() => setMobileDrawerOpen(true)}>☰</button>
+          <h2>QR Menu</h2>
+        </div>
         <div className="nav-links">
           <Link to="/dashboard" className="nav-link active">{t.dashboard}</Link>
           <Link to="/dashboard/orders" className="nav-link">{t.orders}</Link>
@@ -236,6 +241,13 @@ export default function Dashboard() {
           <button onClick={signOut} className="logout-btn">{t.logout}</button>
         </div>
       </nav>
+
+      <MobileDrawer 
+        isOpen={mobileDrawerOpen} 
+        onClose={() => setMobileDrawerOpen(false)} 
+        onLogout={signOut}
+        userRole={userRole}
+      />
 
       {isArchiveBlocked && (
         <div className="archive-blocking-overlay">

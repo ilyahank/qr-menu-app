@@ -4,11 +4,13 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { supabase } from '../supabase';
 import { Link } from 'react-router-dom';
 import LangSwitcher from '../components/LangSwitcher';
+import MobileDrawer from '../components/MobileDrawer';
 import './Settings.css';
 
 export default function Settings() {
-  const { currentUser, signOut } = useAuth();
+  const { currentUser, signOut, userRole } = useAuth();
   const { t } = useLanguage();
+  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const [restaurant, setRestaurant] = useState(null);
   const [formData, setFormData] = useState({
     name: '', tagline: '', color: '#667eea', logo: null,
@@ -78,7 +80,10 @@ export default function Settings() {
   return (
     <div className="settings-page">
       <nav className="dashboard-nav">
-        <div className="nav-brand"><h2>QR Menu</h2></div>
+        <div className="nav-brand">
+          <button className="mobile-menu-btn" onClick={() => setMobileDrawerOpen(true)}>☰</button>
+          <h2>QR Menu</h2>
+        </div>
         <div className="nav-links">
           <Link to="/dashboard" className="nav-link">{t.dashboard}</Link>
           <Link to="/dashboard/orders" className="nav-link">{t.orders}</Link>
@@ -92,6 +97,13 @@ export default function Settings() {
           <button onClick={signOut} className="logout-btn">{t.logout}</button>
         </div>
       </nav>
+
+      <MobileDrawer 
+        isOpen={mobileDrawerOpen} 
+        onClose={() => setMobileDrawerOpen(false)} 
+        onLogout={signOut}
+        userRole={userRole}
+      />
       <div className="settings-content">
         <div className="settings-header"><h1>{t.restaurantSettings}</h1></div>
         {message && <div className={`message ${message.includes('Error') ? 'error' : 'success'}`}>{message}</div>}

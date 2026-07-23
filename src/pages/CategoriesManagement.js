@@ -4,13 +4,15 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { supabase } from '../supabase';
 import { Link } from 'react-router-dom';
 import LangSwitcher from '../components/LangSwitcher';
+import MobileDrawer from '../components/MobileDrawer';
 import './CategoriesManagement.css';
 
 const ICONS = ['🍔','🍕','🍣','🍜','🍗','🥗','🥩','🌮','🍱','🥪','🍲','🫕','🍹','🥤','☕','🧃','🍺','🧋','🍰','🍦','🍩','🍪','🎂','🧁'];
 
 export default function CategoriesManagement() {
-  const { currentUser, signOut } = useAuth();
+  const { currentUser, signOut, userRole } = useAuth();
   const { t } = useLanguage();
+  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const [categories, setCategories] = useState([]);
   const [restaurantId, setRestaurantId] = useState(null);
   const [showForm, setShowForm] = useState(false);
@@ -63,7 +65,10 @@ export default function CategoriesManagement() {
   return (
     <div className="categories-management">
       <nav className="dashboard-nav">
-        <div className="nav-brand"><h2>QR Menu</h2></div>
+        <div className="nav-brand">
+          <button className="mobile-menu-btn" onClick={() => setMobileDrawerOpen(true)}>☰</button>
+          <h2>QR Menu</h2>
+        </div>
         <div className="nav-links">
           <Link to="/dashboard" className="nav-link">{t.dashboard}</Link>
           <Link to="/dashboard/menu" className="nav-link">{t.menu}</Link>
@@ -75,6 +80,13 @@ export default function CategoriesManagement() {
           <button onClick={signOut} className="logout-btn">{t.logout}</button>
         </div>
       </nav>
+
+      <MobileDrawer 
+        isOpen={mobileDrawerOpen} 
+        onClose={() => setMobileDrawerOpen(false)} 
+        onLogout={signOut}
+        userRole={userRole}
+      />
       <div className="categories-content">
         <div className="categories-header">
           <h1>{t.categoriesTitle}</h1>

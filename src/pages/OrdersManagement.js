@@ -4,11 +4,13 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { supabase } from '../supabase';
 import { Link } from 'react-router-dom';
 import LangSwitcher from '../components/LangSwitcher';
+import MobileDrawer from '../components/MobileDrawer';
 import './OrdersManagement.css';
 
 export default function OrdersManagement() {
-  const { currentUser, signOut } = useAuth();
+  const { currentUser, signOut, userRole } = useAuth();
   const { t } = useLanguage();
+  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const [restaurant, setRestaurant] = useState(null);
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -425,7 +427,10 @@ export default function OrdersManagement() {
   return (
     <div className="dashboard-container" style={{ direction: t.dir }}>
       <nav className="dashboard-nav">
-        <div className="nav-brand"><h2>QR Menu</h2></div>
+        <div className="nav-brand">
+          <button className="mobile-menu-btn" onClick={() => setMobileDrawerOpen(true)}>☰</button>
+          <h2>QR Menu</h2>
+        </div>
         <div className="nav-links">
           <Link to="/dashboard" className="nav-link">{t.dashboard}</Link>
           <Link to="/dashboard/orders" className="nav-link active">{t.orders}</Link>
@@ -438,6 +443,13 @@ export default function OrdersManagement() {
           <button onClick={signOut} className="logout-btn">{t.logout}</button>
         </div>
       </nav>
+
+      <MobileDrawer 
+        isOpen={mobileDrawerOpen} 
+        onClose={() => setMobileDrawerOpen(false)} 
+        onLogout={signOut}
+        userRole={userRole}
+      />
 
       <div className="dashboard-content">
         {printErrorMsg && (

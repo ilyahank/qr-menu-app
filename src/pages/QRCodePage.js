@@ -5,11 +5,13 @@ import { supabase } from '../supabase';
 import { Link } from 'react-router-dom';
 import QRCode from 'qrcode.react';
 import LangSwitcher from '../components/LangSwitcher';
+import MobileDrawer from '../components/MobileDrawer';
 import './QRCodePage.css';
 
 export default function QRCodePage() {
-  const { currentUser, signOut } = useAuth();
+  const { currentUser, signOut, userRole } = useAuth();
   const { t } = useLanguage();
+  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const [restaurantId, setRestaurantId] = useState(null);
   const [restaurant, setRestaurant] = useState(null);
   const [qrUrl, setQrUrl] = useState('');
@@ -77,7 +79,10 @@ export default function QRCodePage() {
   return (
     <div className="qr-page" style={{ direction: t.dir }}>
       <nav className="dashboard-nav">
-        <div className="nav-brand"><h2>QR Menu</h2></div>
+        <div className="nav-brand">
+          <button className="mobile-menu-btn" onClick={() => setMobileDrawerOpen(true)}>☰</button>
+          <h2>QR Menu</h2>
+        </div>
         <div className="nav-links">
           <Link to="/dashboard" className="nav-link">{t.dashboard}</Link>
           <Link to="/dashboard/menu" className="nav-link">{t.menu}</Link>
@@ -89,6 +94,13 @@ export default function QRCodePage() {
           <button onClick={signOut} className="logout-btn">{t.logout}</button>
         </div>
       </nav>
+
+      <MobileDrawer 
+        isOpen={mobileDrawerOpen} 
+        onClose={() => setMobileDrawerOpen(false)} 
+        onLogout={signOut}
+        userRole={userRole}
+      />
       <div className="qr-content">
         <div className="qr-header"><h1>{t.qrCodeTitle}</h1></div>
         
