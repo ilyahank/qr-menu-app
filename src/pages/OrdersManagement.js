@@ -217,11 +217,14 @@ export default function OrdersManagement() {
           }]);
       }
 
-      // 4. Trigger browser print dialog (requires tiny timeout for DOM render)
+      // 4. Trigger browser print dialog (requires timeout for DOM render)
       setTimeout(() => {
         window.print();
-        setPrintData(null);
-      }, 300);
+        // Clear print data after print dialog closes
+        setTimeout(() => {
+          setPrintData(null);
+        }, 1000);
+      }, 500);
 
     } catch (error) {
       console.error(error);

@@ -200,21 +200,21 @@
 /* HIDDEN PRINT SECTION FOR THREAT PRINTING */
 #thermal-print-section {
   display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 9999;
 }
 
 /* @media print QUERY FOR BROWSER PRINTING */
 @media print {
   /* Hide all elements on page */
-  body * {
-    visibility: hidden;
+  body > * {
+    display: none !important;
   }
-  /* Show only the receipt container and its contents */
-  #thermal-print-section, #thermal-print-section * {
-    visibility: visible;
-  }
-
-  /* Format printing container size & style */
+  /* Show only the print section */
   #thermal-print-section {
+    display: block !important;
     position: absolute;
     left: 0;
     top: 0;
@@ -229,6 +229,8 @@
   /* Ensure text is black for thermal printing */
   #thermal-print-section * {
     color: black !important;
+    visibility: visible !important;
+    display: block !important;
   }
 
   /* Reset margins for printers */
