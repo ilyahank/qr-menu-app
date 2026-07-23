@@ -11,12 +11,13 @@ export default function TablesManagement() {
   const [restaurant, setRestaurant] = useState(null);
   const [tables, setTables] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [newTableNumber, setNewTableNumber] = useState('');
   const [newTableName, setNewTableName] = useState('');
   const [isAdding, setIsAdding] = useState(false);
 
-  const isRtl = t.dir === 'rtl';
+  const isRtl = t?.dir === 'rtl';
 
   useEffect(() => {
     const fetchData = async () => {
@@ -45,6 +46,7 @@ export default function TablesManagement() {
         }
       } catch (error) {
         console.error(error);
+        setError(error.message);
       } finally {
         setLoading(false);
       }
@@ -129,21 +131,27 @@ export default function TablesManagement() {
     link.click();
   };
 
-  if (loading) return <div className="loading">{t.loadingMenu}</div>;
+  if (loading) return <div className="loading">{t?.loadingMenu || 'Loading...'}</div>;
+
+  if (error) return <div className="error-page" style={{ padding: '50px', textAlign: 'center' }}>
+    <h2>Error</h2>
+    <p>{error}</p>
+    <button onClick={() => window.location.reload()}>Retry</button>
+  </div>;
 
   return (
-    <div className="tables-management" style={{ direction: t.dir }}>
+    <div className="tables-management" style={{ direction: t?.dir }}>
       <nav className="dashboard-nav">
         <div className="nav-brand"><h2>QR Menu</h2></div>
         <div className="nav-links">
-          <a href="/dashboard" className="nav-link">{t.dashboard}</a>
-          <a href="/dashboard/orders" className="nav-link">{t.orders}</a>
-          <a href="/dashboard/analytics" className="nav-link">{t.analytics}</a>
-          <a href="/dashboard/menu" className="nav-link">{t.menu}</a>
-          <a href="/dashboard/categories" className="nav-link">{t.categories}</a>
+          <a href="/dashboard" className="nav-link">{t?.dashboard || 'Dashboard'}</a>
+          <a href="/dashboard/orders" className="nav-link">{t?.orders || 'Orders'}</a>
+          <a href="/dashboard/analytics" className="nav-link">{t?.analytics || 'Analytics'}</a>
+          <a href="/dashboard/menu" className="nav-link">{t?.menu || 'Menu'}</a>
+          <a href="/dashboard/categories" className="nav-link">{t?.categories || 'Categories'}</a>
           <a href="/dashboard/tables" className="nav-link active">{isRtl ? 'الطاولات' : 'Tables'}</a>
-          <a href="/dashboard/qr-code" className="nav-link">{t.qrCode}</a>
-          <a href="/dashboard/settings" className="nav-link">{t.settings}</a>
+          <a href="/dashboard/qr-code" className="nav-link">{t?.qrCode || 'QR Code'}</a>
+          <a href="/dashboard/settings" className="nav-link">{t?.settings || 'Settings'}</a>
         </div>
       </nav>
 
@@ -187,7 +195,7 @@ export default function TablesManagement() {
                   onClick={() => handleDeleteTable(table.id)}
                   className="delete-table-btn"
                 >
-                  {t.delete}
+                  {t?.delete || 'Delete'}
                 </button>
               </div>
             ))
@@ -229,10 +237,10 @@ export default function TablesManagement() {
                     className="cancel-btn"
                     disabled={isAdding}
                   >
-                    {t.cancel}
+                    {t?.cancel || 'Cancel'}
                   </button>
                   <button type="submit" className="submit-btn" disabled={isAdding}>
-                    {isAdding ? t.saving : t.add}
+                    {isAdding ? (t?.saving || 'Saving...') : (t?.add || 'Add')}
                   </button>
                 </div>
               </form>
