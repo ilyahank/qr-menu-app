@@ -17,6 +17,8 @@ import MenuManagement from './pages/MenuManagement';
 import CategoriesManagement from './pages/CategoriesManagement';
 import Settings from './pages/Settings';
 import QRCodePage from './pages/QRCodePage';
+import OrdersManagement from './pages/OrdersManagement';
+import Analytics from './pages/Analytics';
 
 import './App.css';
 import { useAuth } from './contexts/AuthContext';
@@ -165,11 +167,14 @@ function App() {
             <Route path="/dashboard/categories" element={<PrivateRoute><CategoriesManagement /></PrivateRoute>} />
             <Route path="/dashboard/settings" element={<PrivateRoute><Settings /></PrivateRoute>} />
             <Route path="/dashboard/qr-code" element={<PrivateRoute><QRCodePage /></PrivateRoute>} />
+            <Route path="/dashboard/orders" element={<PrivateRoute><OrdersManagement /></PrivateRoute>} />
+            <Route path="/dashboard/analytics" element={<PrivateRoute><Analytics /></PrivateRoute>} />
             
             {/* Admin Routes */}
             <Route path="/admin" element={<AdminRoute><AdminPanel /></AdminRoute>} />
             <Route path="/admin/approvals" element={<AdminRoute><AdminApprovals /></AdminRoute>} />
             <Route path="/admin/restaurant/:restaurantId" element={<AdminRoute><AdminRestaurantEditor /></AdminRoute>} />
+            <Route path="/admin/analytics" element={<AdminRoute><Analytics /></AdminRoute>} />
             
             {/* Default redirect */}
             <Route path="/" element={<Navigate to="/login" />} />

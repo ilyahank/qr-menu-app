@@ -180,21 +180,28 @@
   #thermal-print-section, #thermal-print-section * {
     visibility: visible;
   }
-  
+
   /* Format printing container size & style */
   #thermal-print-section {
     position: absolute;
     left: 0;
     top: 0;
-    width: 58mm; /* standard size, browser scales automatically */
+    width: 58mm; /* standard thermal printer width, browser scales automatically */
     background: white;
     box-shadow: none;
     margin: 0;
-    padding: 0;
+    padding: 5px;
+    font-family: 'Courier New', monospace;
   }
-  
+
+  /* Ensure text is black for thermal printing */
+  #thermal-print-section * {
+    color: black !important;
+  }
+
   /* Reset margins for printers */
   @page {
     margin: 0;
+    size: 58mm auto;
   }
 }

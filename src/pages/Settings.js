@@ -81,6 +81,8 @@ export default function Settings() {
         <div className="nav-brand"><h2>QR Menu</h2></div>
         <div className="nav-links">
           <Link to="/dashboard" className="nav-link">{t.dashboard}</Link>
+          <Link to="/dashboard/orders" className="nav-link">{t.orders}</Link>
+          <Link to="/dashboard/analytics" className="nav-link">{t.analytics}</Link>
           <Link to="/dashboard/menu" className="nav-link">{t.menu}</Link>
           <Link to="/dashboard/categories" className="nav-link">{t.categories}</Link>
           <Link to="/dashboard/qr-code" className="nav-link">{t.qrCode}</Link>

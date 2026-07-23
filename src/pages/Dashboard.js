@@ -21,6 +21,8 @@ export default function Dashboard() {
   const [autoArchivedTriggered, setAutoArchivedTriggered] = useState(false);
   const [archiveLoading, setArchiveLoading] = useState(false);
   const [archivedReports, setArchivedReports] = useState([]);
+  const [subscriptionStatus, setSubscriptionStatus] = useState(null);
+  const [daysRemaining, setDaysRemaining] = useState(null);
 
   useEffect(() => {
     const fetchRestaurantData = async () => {
@@ -48,6 +50,27 @@ export default function Dashboard() {
             .select('*', { count: 'exact', head: true })
             .eq('restaurant_id', userData.restaurant_id);
           setStats({ menuItems: menuCount || 0, categories: catCount || 0 });
+
+          // Fetch subscription status
+          const { data: subData } = await supabase
+            .from('subscriptions')
+            .select('*')
+            .eq('restaurant_id', userData.restaurant_id)
+            .single();
+
+          if (subData) {
+            const end = new Date(subData.end_date);
+            const today = new Date();
+            end.setHours(23, 59, 59, 999);
+            today.setHours(0, 0, 0, 0);
+            const diffTime = end - today;
+            const days = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            setDaysRemaining(days);
+            setSubscriptionStatus(days <= 0 ? 'expired' : (days <= 7 ? 'expiring_soon' : 'active'));
+          } else {
+            setDaysRemaining(0);
+            setSubscriptionStatus('expired');
+          }
         }
       } catch (error) {
         console.error(error);
@@ -179,10 +202,31 @@ export default function Dashboard() {
         </div>
       )}
 
+      {(subscriptionStatus === 'expiring_soon' || subscriptionStatus === 'expired') && (
+        <div className="subscription-banner" style={{
+          backgroundColor: '#dc2626',
+          color: '#ffffff',
+          padding: '12px 20px',
+          textAlign: 'center',
+          fontWeight: '600',
+          fontSize: '14px',
+          zIndex: 9998,
+          fontFamily: 'sans-serif'
+        }}>
+          {subscriptionStatus === 'expiring_soon' ? (
+            <span>⚠️ {t.subBannerExpiring.replace('{days}', daysRemaining)}</span>
+          ) : (
+            <span>🚫 {t.subBannerExpired}</span>
+          )}
+        </div>
+      )}
+
       <nav className="dashboard-nav">
         <div className="nav-brand"><h2>QR Menu</h2></div>
         <div className="nav-links">
           <Link to="/dashboard" className="nav-link active">{t.dashboard}</Link>
+          <Link to="/dashboard/orders" className="nav-link">{t.orders}</Link>
+          <Link to="/dashboard/analytics" className="nav-link">{t.analytics}</Link>
           <Link to="/dashboard/menu" className="nav-link">{t.menu}</Link>
           <Link to="/dashboard/categories" className="nav-link">{t.categories}</Link>
           <Link to="/dashboard/qr-code" className="nav-link">{t.qrCode}</Link>
@@ -231,6 +275,8 @@ export default function Dashboard() {
           <div className="action-grid">
             <Link to="/dashboard/menu" className="action-card"><div className="action-icon">🍔</div><div>{t.addMenuItem}</div></Link>
             <Link to="/dashboard/categories" className="action-card"><div className="action-icon">📂</div><div>{t.manageCategories}</div></Link>
+            <Link to="/dashboard/orders" className="action-card"><div className="action-icon">🧾</div><div>{t.orders}</div></Link>
+            <Link to="/dashboard/analytics" className="action-card"><div className="action-icon">📊</div><div>{t.analytics}</div></Link>
             <Link to="/dashboard/qr-code" className="action-card"><div className="action-icon">📱</div><div>{t.viewQRCode}</div></Link>
             <Link to="/dashboard/settings" className="action-card"><div className="action-icon">⚙️</div><div>{t.settings}</div></Link>
           </div>
