@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { supabase } from '../supabase';
 import './PublicMenu.css';
 import { useLanguage } from '../contexts/LanguageContext';
 
 export default function PublicMenu() {
   const { restaurantId } = useParams();
+  const [searchParams] = useSearchParams();
   const [restaurant, setRestaurant] = useState(null);
   const [menuItems, setMenuItems] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -25,6 +26,14 @@ export default function PublicMenu() {
 
   // Session State
   const [sessionId, setSessionId] = useState('');
+
+  // Get table number from URL query parameter on mount
+  useEffect(() => {
+    const tableParam = searchParams.get('table');
+    if (tableParam) {
+      setTableNumber(tableParam);
+    }
+  }, [searchParams]);
 
   // Initialize session on mount
   useEffect(() => {

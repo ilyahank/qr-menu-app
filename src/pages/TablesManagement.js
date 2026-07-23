@@ -56,7 +56,7 @@ export default function TablesManagement() {
 
   const generateQRUrl = (tableId) => {
     const baseUrl = window.location.origin;
-    return `${baseUrl}/menu/${restaurant.id}?table=${tableId}`;
+    return `${baseUrl}/r/${restaurant.id}?table=${tableId}`;
   };
 
   const handleAddTable = async (e) => {
