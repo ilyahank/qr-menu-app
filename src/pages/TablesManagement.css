@@ -1,52 +1,53 @@
 .tables-management {
   min-height: 100vh;
-  background: #f5f7fa;
+  background: var(--bg-secondary);
 }
 
 .tables-header {
-  margin-bottom: 25px;
+  margin-bottom: var(--spacing-xl);
 }
 
 .add-table-btn {
-  padding: 12px 24px;
-  background: #4f46e5;
+  padding: 0.75rem 1.5rem;
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-hover) 100%);
   color: white;
   border: none;
-  border-radius: 10px;
-  font-size: 14px;
+  border-radius: var(--radius);
+  font-size: 0.875rem;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.2s ease;
+  box-shadow: var(--shadow-md);
 }
 
 .add-table-btn:hover {
-  background: #4338ca;
   transform: translateY(-1px);
+  box-shadow: var(--shadow-lg);
 }
 
 .tables-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 25px;
-  margin-top: 25px;
+  gap: var(--spacing-lg);
+  margin-top: var(--spacing-lg);
 }
 
 .table-card {
-  background: white;
-  border-radius: 16px;
-  padding: 25px;
-  box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+  background: var(--bg-primary);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-lg);
+  box-shadow: var(--shadow);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 20px;
-  border: 1px solid #f0f0f0;
-  transition: all 0.3s;
+  gap: var(--spacing);
+  border: 1px solid var(--gray-200);
+  transition: all 0.2s ease;
 }
 
 .table-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(0,0,0,0.08);
+  box-shadow: var(--shadow-md);
 }
 
 .table-info {
@@ -54,72 +55,78 @@
 }
 
 .table-info h3 {
-  margin: 0 0 8px 0;
-  font-size: 20px;
-  color: #111827;
+  margin: 0 0 var(--spacing-xs) 0;
+  font-size: 1.25rem;
+  color: var(--text-primary);
   font-weight: 700;
 }
 
 .table-info p {
   margin: 0;
-  font-size: 14px;
-  color: #6b7280;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
 }
 
 .qr-section {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 15px;
+  gap: var(--spacing);
 }
 
 .qr-container {
-  padding: 15px;
-  background: white;
-  border: 2px solid #e5e7eb;
-  border-radius: 12px;
+  padding: var(--spacing);
+  background: var(--bg-primary);
+  border: 2px solid var(--gray-200);
+  border-radius: var(--radius-lg);
 }
 
 .download-qr-btn {
-  padding: 8px 20px;
-  background: #10b981;
+  padding: 0.5rem 1rem;
+  background: var(--success);
   color: white;
   border: none;
-  border-radius: 8px;
-  font-size: 13px;
+  border-radius: var(--radius);
+  font-size: 0.75rem;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.2s ease;
 }
 
 .download-qr-btn:hover {
   background: #059669;
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
 }
 
 .delete-table-btn {
-  padding: 8px 20px;
-  background: #ef4444;
+  padding: 0.5rem 1rem;
+  background: var(--danger);
   color: white;
   border: none;
-  border-radius: 8px;
-  font-size: 13px;
+  border-radius: var(--radius);
+  font-size: 0.75rem;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.2s ease;
 }
 
 .delete-table-btn:hover {
   background: #dc2626;
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
 }
 
 .no-tables {
   grid-column: 1 / -1;
   text-align: center;
-  padding: 60px 20px;
-  color: #999;
-  background: white;
-  border-radius: 16px;
-  font-size: 16px;
+  padding: var(--spacing-2xl) var(--spacing);
+  color: var(--text-tertiary);
+  background: var(--bg-primary);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--gray-200);
+  box-shadow: var(--shadow);
+  font-size: 1rem;
 }
 
 .modal-overlay {
@@ -128,94 +135,104 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0,0,0,0.5);
+  background: rgba(0, 0, 0, 0.5);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1000;
+  backdrop-filter: blur(4px);
 }
 
 .modal-content {
-  background: white;
-  padding: 30px;
-  border-radius: 16px;
+  background: var(--bg-primary);
+  padding: var(--spacing-xl);
+  border-radius: var(--radius-xl);
   width: 90%;
   max-width: 400px;
-  box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+  box-shadow: var(--shadow-xl);
+  border: 1px solid var(--gray-200);
 }
 
 .modal-content h2 {
-  margin: 0 0 25px 0;
-  font-size: 20px;
-  color: #111827;
+  margin: 0 0 var(--spacing-lg) 0;
+  font-size: 1.25rem;
+  color: var(--text-primary);
+  font-weight: 700;
 }
 
 .form-group {
-  margin-bottom: 20px;
+  margin-bottom: var(--spacing);
 }
 
 .form-group label {
   display: block;
-  margin-bottom: 8px;
-  font-size: 14px;
-  font-weight: 600;
-  color: #374151;
+  margin-bottom: var(--spacing-sm);
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-primary);
 }
 
 .form-group input {
   width: 100%;
-  padding: 12px;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  font-size: 14px;
-  transition: border-color 0.2s;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--gray-300);
+  border-radius: var(--radius);
+  font-size: 0.875rem;
+  transition: all 0.2s ease;
+  background: var(--bg-primary);
+  font-family: var(--font-sans);
 }
 
 .form-group input:focus {
   outline: none;
-  border-color: #4f46e5;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-light);
 }
 
 .modal-actions {
   display: flex;
-  gap: 12px;
+  gap: var(--spacing-sm);
   justify-content: flex-end;
-  margin-top: 25px;
+  margin-top: var(--spacing-lg);
 }
 
 .cancel-btn {
-  padding: 10px 20px;
-  background: #f3f4f6;
-  color: #374151;
-  border: none;
-  border-radius: 8px;
-  font-size: 14px;
-  font-weight: 600;
+  padding: 0.625rem 1.25rem;
+  background: var(--gray-100);
+  color: var(--text-secondary);
+  border: 1px solid var(--gray-300);
+  border-radius: var(--radius);
+  font-size: 0.875rem;
+  font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.2s ease;
 }
 
 .cancel-btn:hover {
-  background: #e5e7eb;
+  background: var(--gray-200);
+  color: var(--text-primary);
 }
 
 .submit-btn {
-  padding: 10px 20px;
-  background: #4f46e5;
+  padding: 0.625rem 1.25rem;
+  background: var(--primary);
   color: white;
   border: none;
-  border-radius: 8px;
-  font-size: 14px;
+  border-radius: var(--radius);
+  font-size: 0.875rem;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.2s ease;
+  box-shadow: var(--shadow-sm);
 }
 
 .submit-btn:hover {
-  background: #4338ca;
+  background: var(--primary-hover);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
 }
 
 .submit-btn:disabled {
-  opacity: 0.6;
+  opacity: 0.5;
   cursor: not-allowed;
 }
