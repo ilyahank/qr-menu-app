@@ -43,7 +43,7 @@ module.exports = async (req, res) => {
     }
 
     // 2. Parse request body
-    const { restaurant_id, duration_days, extend_notes } = req.body;
+    const { restaurant_id, duration_days, extend_notes, start_date } = req.body;
     if (!restaurant_id || !duration_days) {
       return res.status(400).json({ error: 'Missing restaurant_id or duration_days' });
     }
@@ -66,6 +66,7 @@ module.exports = async (req, res) => {
 
     let currentEndDate = null;
     let newEndDate = new Date();
+    let computedStartDate = new Date();
 
     if (subData && subData.end_date) {
       currentEndDate = new Date(subData.end_date);
@@ -80,7 +81,11 @@ module.exports = async (req, res) => {
         newEndDate.setDate(newEndDate.getDate() + durationDays);
       }
     } else {
-      // No subscription record: extend from today
+      // No subscription record: start from start_date parameter or today
+      if (start_date) {
+        computedStartDate = new Date(start_date);
+      }
+      newEndDate = new Date(computedStartDate);
       newEndDate.setDate(newEndDate.getDate() + durationDays);
     }
 
@@ -109,7 +114,7 @@ module.exports = async (req, res) => {
         .from('subscriptions')
         .insert([{
           restaurant_id: restaurant_id,
-          start_date: new Date(),
+          start_date: computedStartDate,
           end_date: newEndDate,
           status: status
         }]);
@@ -123,11 +128,11 @@ module.exports = async (req, res) => {
       .insert([{
         restaurant_id: restaurant_id,
         extended_by: user.id,
-        action_type: 'extend',
+        action_type: subData ? 'extend' : 'create',
         old_end_date: currentEndDate,
         new_end_date: newEndDate,
         duration_days: durationDays,
-        notes: extendNotes || 'Manual extension'
+        notes: extend_notes || (subData ? 'Manual extension' : 'Initial creation')
       }]);
 
     if (histError) {
@@ -135,7 +140,7 @@ module.exports = async (req, res) => {
     }
 
     return res.status(200).json({
-      message: 'Subscription extended successfully',
+      message: 'Subscription updated successfully',
       newEndDate: newEndDate.toISOString(),
       status: status
     });

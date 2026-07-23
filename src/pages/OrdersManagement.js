@@ -16,6 +16,7 @@ export default function OrdersManagement() {
 
   // Print state for rendering hidden receipt
   const [printData, setPrintData] = useState(null);
+  const [printErrorMsg, setPrintErrorMsg] = useState('');
 
   useEffect(() => {
     const fetchOwnerRestaurant = async () => {
@@ -110,9 +111,24 @@ export default function OrdersManagement() {
       if (error) throw error;
       
       // Update in-memory state
-      setOrders(orders.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
+      const updatedOrders = orders.map(o => o.id === orderId ? { ...o, status: newStatus } : o);
+      setOrders(updatedOrders);
+
+      // Automatically trigger thermal print receipts
+      const order = orders.find(o => o.id === orderId);
+      if (order) {
+        const orderWithNewStatus = { ...order, status: newStatus };
+        if (newStatus === 'confirmed') {
+          // Print kitchen copy automatically when order is confirmed
+          handlePrint(orderWithNewStatus, 'kitchen');
+        } else if (newStatus === 'completed') {
+          // Print customer copy automatically when order is completed
+          handlePrint(orderWithNewStatus, 'customer');
+        }
+      }
     } catch (error) {
-      alert('Error updating order status: ' + error.message);
+      setPrintErrorMsg(t.dir === 'rtl' ? 'فشل تحديث حالة الطلب: ' + error.message : 'Error updating order status: ' + error.message);
+      setTimeout(() => setPrintErrorMsg(''), 6000);
     }
   };
 
@@ -165,7 +181,8 @@ export default function OrdersManagement() {
 
     } catch (error) {
       console.error(error);
-      alert(t.printError);
+      setPrintErrorMsg(t.printError);
+      setTimeout(() => setPrintErrorMsg(''), 6000);
     }
   };
 
@@ -190,6 +207,25 @@ export default function OrdersManagement() {
       </nav>
 
       <div className="dashboard-content">
+        {printErrorMsg && (
+          <div className="print-error-banner" style={{
+            backgroundColor: '#fef2f2',
+            color: '#b91c1c',
+            border: '1px solid #fecaca',
+            padding: '12px 20px',
+            borderRadius: '10px',
+            marginBottom: '20px',
+            fontSize: '14px',
+            fontWeight: '500',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            boxShadow: '0 2px 4px rgba(0,0,0,0.02)'
+          }}>
+            <span>⚠️ {printErrorMsg}</span>
+            <button onClick={() => setPrintErrorMsg('')} style={{ background: 'none', border: 'none', color: '#b91c1c', cursor: 'pointer', fontSize: '18px', fontWeight: 'bold' }}>×</button>
+          </div>
+        )}
         <header className="dashboard-header">
           <h1>{t.orders}</h1>
           {restaurant && <div className="restaurant-info"><h2>{restaurant.name}</h2></div>}

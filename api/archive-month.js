@@ -1,14 +1,14 @@
 const { createClient } = require('@supabase/supabase-js');
 const PDFDocument = require('pdfkit');
-const { ArabicReshaper } = require('arabic-persian-reshaper');
-const axios = require('axios');
+const { ArabicShaper } = require('arabic-persian-reshaper');
+const https = require('https');
 
 // Initialize Supabase
 const supabaseUrl = process.env.REACT_APP_SUPABASE_URL || 'https://hdbewuhbpkfbhowaduun.supabase.co';
 const supabaseAnonKey = process.env.REACT_APP_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhkYmV3dWhicGtmYmhvd2FkdXVuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2NDI5MzQsImV4cCI6MjA5NzIxODkzNH0.RhaY4nmyvedimY4RhZcjWtm0SopnTWleW4zYUl0NYHc';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-const reshaper = new ArabicReshaper();
+// Using ArabicShaper directly
 
 // Helper to format Arabic text for LTR PDFKit engine
 function shapeArabic(text) {
@@ -21,7 +21,7 @@ function shapeArabic(text) {
   const processedWords = words.map(word => {
     // If the word contains Arabic letters, shape and reverse it
     if (/[\u0600-\u06FF]/.test(word)) {
-      const reshaped = reshaper.convertArabic(word);
+      const reshaped = ArabicShaper.convertArabic(word);
       return reshaped.split('').reverse().join('');
     }
     return word;
@@ -33,12 +33,23 @@ function shapeArabic(text) {
 
 // Caching the font buffer in memory
 let cachedFontBuffer = null;
-async function getFontBuffer() {
-  if (cachedFontBuffer) return cachedFontBuffer;
-  const fontUrl = 'https://github.com/google/fonts/raw/main/ofl/amiri/Amiri-Regular.ttf';
-  const response = await axios.get(fontUrl, { responseType: 'arraybuffer' });
-  cachedFontBuffer = Buffer.from(response.data);
-  return cachedFontBuffer;
+function getFontBuffer() {
+  if (cachedFontBuffer) return Promise.resolve(cachedFontBuffer);
+  const fontUrl = 'https://raw.githubusercontent.com/google/fonts/main/ofl/amiri/Amiri-Regular.ttf';
+  return new Promise((resolve, reject) => {
+    https.get(fontUrl, (res) => {
+      if (res.statusCode !== 200) {
+        reject(new Error(`Failed to download font: status ${res.statusCode}`));
+        return;
+      }
+      const data = [];
+      res.on('data', (chunk) => data.push(chunk));
+      res.on('end', () => {
+        cachedFontBuffer = Buffer.concat(data);
+        resolve(cachedFontBuffer);
+      });
+    }).on('error', (err) => reject(err));
+  });
 }
 
 module.exports = async (req, res) => {
