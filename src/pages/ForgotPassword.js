@@ -51,7 +51,7 @@ export default function ForgotPassword() {
     <div className="forgot-container">
       <div className="forgot-card">
         <div className="forgot-lang"><LangSwitcher /></div>
-        <h1>QR Menu</h1>
+        <h1>IRM</h1>
         <h2>Forgot Password?</h2>
         {error && <div className="error-message">{error}</div>}
         

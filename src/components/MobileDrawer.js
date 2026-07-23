@@ -26,7 +26,7 @@ export default function MobileDrawer({ isOpen, onClose, onLogout, userRole }) {
       <div className={`mobile-drawer-overlay ${isOpen ? 'open' : ''}`} onClick={onClose}></div>
       <div className={`mobile-drawer ${isOpen ? 'open' : ''}`}>
         <div className="mobile-drawer-header">
-          <h2>QR Menu</h2>
+          <h2>IRM</h2>
           <button className="mobile-drawer-close" onClick={onClose}>✕</button>
         </div>
         

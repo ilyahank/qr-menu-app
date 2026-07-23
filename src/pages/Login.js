@@ -47,7 +47,7 @@ export default function Login() {
     <div className="login-container">
       <div className="login-card">
         <div className="login-lang"><LangSwitcher /></div>
-        <h1>QR Menu</h1>
+        <h1>IRM</h1>
         <h2>Restaurant Login</h2>
         {error && <div className="error-message">{error}</div>}
         <form onSubmit={handleSubmit}>

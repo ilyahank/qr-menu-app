@@ -529,7 +529,7 @@ export default function AdminPanel() {
   return (
     <div className="admin-panel" style={{ direction: 'rtl', textAlign: 'right' }}>
       <nav className="admin-nav" style={{ padding: '15px 30px' }}>
-        <div className="nav-brand"><h2 style={{ margin: 0 }}>لوحة الإدارة QR Menu</h2></div>
+        <div className="nav-brand"><h2 style={{ margin: 0 }}>لوحة الإدارة IRM</h2></div>
         <div className="nav-links" style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
           <LangSwitcher />
           <Link to="/admin/approvals" className="nav-link" style={{ color: 'white', textDecoration: 'none', fontWeight: '500' }}>طلبات التسجيل</Link>

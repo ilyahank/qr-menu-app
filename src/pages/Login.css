@@ -1,7 +1,10 @@
 .login-container {
   min-height: 100vh;
   display: flex;
-  background: var(--bg-secondary);
+  background: linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.6)), url('/restaurant-bg.jpg');
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
 }
 
 .login-illustration {

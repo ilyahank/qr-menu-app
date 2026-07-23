@@ -92,7 +92,7 @@ export default function Signup() {
     <div className="signup-container">
       <div className="signup-card">
         <div className="signup-lang"><LangSwitcher /></div>
-        <h1>QR Menu</h1>
+        <h1>IRM</h1>
         <h2>Restaurant Signup</h2>
         {error && <div className="error-message">{error}</div>}
         

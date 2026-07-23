@@ -82,7 +82,7 @@ export default function Settings() {
       <nav className="dashboard-nav">
         <div className="nav-brand">
           <button className="mobile-menu-btn" onClick={() => setMobileDrawerOpen(true)}>☰</button>
-          <h2>QR Menu</h2>
+          <h2>IRM</h2>
         </div>
         <div className="nav-links">
           <Link to="/dashboard" className="nav-link">{t.dashboard}</Link>
