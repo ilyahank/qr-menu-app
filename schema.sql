@@ -154,7 +154,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 CREATE TRIGGER trigger_update_daily_sales
-AFTER INSERT OR UPDATE OF status OR UPDATE OF total_price ON public.orders
+AFTER INSERT OR UPDATE OF status, total_price ON public.orders
 FOR EACH ROW
 EXECUTE FUNCTION update_daily_sales_summary();
 
@@ -323,6 +323,9 @@ CREATE TABLE IF NOT EXISTS public.restaurant_tables (
 
 CREATE INDEX idx_restaurant_tables_restaurant ON public.restaurant_tables(restaurant_id, is_active);
 
+-- DISABLE ROW LEVEL SECURITY FOR RESTAURANT TABLES
+ALTER TABLE public.restaurant_tables DISABLE ROW LEVEL SECURITY;
+
 -- 12. TAKEAWAY QR CODES
 CREATE TABLE IF NOT EXISTS public.takeaway_qr_codes (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -334,4 +337,7 @@ CREATE TABLE IF NOT EXISTS public.takeaway_qr_codes (
 );
 
 CREATE INDEX idx_takeaway_qr_restaurant ON public.takeaway_qr_codes(restaurant_id, is_active);
+
+-- DISABLE ROW LEVEL SECURITY FOR TAKEAWAY QR CODES
+ALTER TABLE public.takeaway_qr_codes DISABLE ROW LEVEL SECURITY;
 
