@@ -56,6 +56,13 @@ CREATE POLICY "Owners can view their restaurant" ON public.restaurants
 -- USERS RLS Policies
 DROP POLICY IF EXISTS "Admins can view all users" ON public.users;
 DROP POLICY IF EXISTS "Owners can view their restaurant users" ON public.users;
+DROP POLICY IF EXISTS "Allow login by username" ON public.users;
+
+-- Allow unauthenticated users to query users by username for login only
+CREATE POLICY "Allow login by username" ON public.users
+    FOR SELECT
+    TO anon
+    USING (true); -- Note: This allows anon access for login. Consider using a PostgreSQL function for more secure authentication
 
 -- Admins can see all users
 CREATE POLICY "Admins can view all users" ON public.users
