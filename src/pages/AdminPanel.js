@@ -267,32 +267,60 @@ export default function AdminPanel() {
         }
       }
 
-      // Get user session to retrieve the JWT token
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token;
+      // Get current subscription
+      const { data: currentSub, error: fetchError } = await supabase
+        .from('subscriptions')
+        .select('*')
+        .eq('restaurant_id', selectedRestForSub.id)
+        .single();
 
-      if (!token) {
-        throw new Error('No active session found. Please log in again.');
+      if (fetchError && fetchError.code !== 'PGRST116') {
+        throw fetchError;
       }
 
-      // Call serverless API to perform the extension securely via service role key (bypassing RLS)
-      const response = await fetch('/api/extend-subscription', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
+      // Calculate new end date
+      const oldEndDate = currentSub ? new Date(currentSub.end_date) : new Date();
+      const newEndDate = new Date(oldEndDate);
+      newEndDate.setDate(oldEndDate.getDate() + durationDays);
+      newEndDate.setHours(23, 59, 59, 999);
+
+      // Update or create subscription
+      let subError;
+      if (currentSub) {
+        const { error } = await supabase
+          .from('subscriptions')
+          .update({
+            end_date: newEndDate,
+            status: durationDays > 7 ? 'active' : 'expiring_soon'
+          })
+          .eq('restaurant_id', selectedRestForSub.id);
+        subError = error;
+      } else {
+        const { error } = await supabase
+          .from('subscriptions')
+          .insert([{
+            restaurant_id: selectedRestForSub.id,
+            start_date: new Date(),
+            end_date: newEndDate,
+            status: durationDays > 7 ? 'active' : 'expiring_soon'
+          }]);
+        subError = error;
+      }
+
+      if (subError) throw subError;
+
+      // Log in history
+      await supabase
+        .from('subscription_history')
+        .insert([{
           restaurant_id: selectedRestForSub.id,
+          extended_by: currentUser?.id || null,
+          action_type: currentSub ? 'extend' : 'create',
+          old_end_date: currentSub?.end_date || null,
+          new_end_date: newEndDate,
           duration_days: durationDays,
-          extend_notes: extendNotes || 'Manual extension'
-        })
-      });
-
-      const resData = await response.json();
-      if (!response.ok) {
-        throw new Error(resData.error || 'Failed to extend subscription');
-      }
+          notes: extendNotes || 'Manual extension'
+        }]);
 
       alert('✅ Subscription extended successfully!');
       setShowExtendModal(false);
@@ -316,21 +344,29 @@ export default function AdminPanel() {
       
       const { data, error } = await supabase
         .from('subscription_history')
-        .select(`
-          id,
-          action_type,
-          old_end_date,
-          new_end_date,
-          duration_days,
-          notes,
-          created_at,
-          users (username)
-        `)
+        .select('*')
         .eq('restaurant_id', restaurant.id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setHistoryList(data || []);
+      
+      // Fetch usernames separately to avoid RLS join issues
+      const historyWithUsers = await Promise.all(
+        (data || []).map(async (history) => {
+          let username = 'Unknown';
+          if (history.extended_by) {
+            const { data: userData } = await supabase
+              .from('users')
+              .select('username')
+              .eq('id', history.extended_by)
+              .single();
+            username = userData?.username || 'Unknown';
+          }
+          return { ...history, users: { username } };
+        })
+      );
+      
+      setHistoryList(historyWithUsers);
       setShowHistoryModal(true);
     } catch (error) {
       alert('Error fetching history: ' + error.message);
