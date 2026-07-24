@@ -17,9 +17,12 @@ export default function Login() {
     const user = localStorage.getItem('currentUser');
     if (user) {
       const userData = JSON.parse(user);
-      if (userData.role === 'admin') {
+      const currentPath = window.location.pathname;
+      
+      // Only navigate if not already on the correct page
+      if (userData.role === 'admin' && currentPath !== '/admin') {
         navigate('/admin');
-      } else {
+      } else if (userData.role !== 'admin' && currentPath !== '/dashboard') {
         navigate('/dashboard');
       }
     }
