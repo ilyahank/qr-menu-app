@@ -69,6 +69,7 @@ RETURNS UUID AS $$
 DECLARE
     v_restaurant_id UUID;
     v_user_id UUID := auth.uid();
+    v_result UUID;
 BEGIN
     -- Get restaurant_id from current user
     SELECT restaurant_id INTO v_restaurant_id
@@ -95,8 +96,8 @@ BEGIN
         p_record_id,
         p_old_value,
         p_new_value,
-        current_setting('request.headers')::json->>'x-forwarded-for',
-        current_setting('request.headers')::json->>'user-agent',
+        current_setting('request.headers', '{}')::json->>'x-forwarded-for',
+        current_setting('request.headers', '{}')::json->>'user-agent',
         p_metadata
     )
     RETURNING id INTO v_result;
