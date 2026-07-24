@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabase';
 import LangSwitcher from '../components/LangSwitcher';
+import restaurantBg from '../assets/restaurant-bg.jpg';
 import './Login.css';
 
 export default function Login() {
@@ -91,7 +92,7 @@ export default function Login() {
   };
 
   return (
-    <div className="login-container">
+    <div className="login-container" style={{ backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.6)), url(${restaurantBg})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundAttachment: 'fixed' }}>
       <div className="login-card">
         <div className="login-lang"><LangSwitcher /></div>
         <h1>IRM</h1>
