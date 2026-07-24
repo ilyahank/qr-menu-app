@@ -142,12 +142,19 @@ DROP POLICY IF EXISTS "Admins can view all subscriptions" ON public.subscription
 DROP POLICY IF EXISTS "Owners can view their subscription" ON public.subscriptions;
 DROP POLICY IF EXISTS "Allow anon subscription access" ON public.subscriptions;
 DROP POLICY IF EXISTS "Admins can update subscriptions" ON public.subscriptions;
+DROP POLICY IF EXISTS "Allow anon update subscriptions" ON public.subscriptions;
 
--- Allow anon access for subscription queries (needed for some operations)
+-- Allow anon access for subscription queries and updates (needed for some operations)
 CREATE POLICY "Allow anon subscription access" ON public.subscriptions
     FOR SELECT
     TO anon
     USING (true);
+
+CREATE POLICY "Allow anon update subscriptions" ON public.subscriptions
+    FOR ALL
+    TO anon
+    USING (true)
+    WITH CHECK (true);
 
 -- Admins can see all subscriptions
 CREATE POLICY "Admins can view all subscriptions" ON public.subscriptions
@@ -173,12 +180,18 @@ DROP POLICY IF EXISTS "Admins can view all subscription history" ON public.subsc
 DROP POLICY IF EXISTS "Owners can view their subscription history" ON public.subscription_history;
 DROP POLICY IF EXISTS "Allow anon subscription history access" ON public.subscription_history;
 DROP POLICY IF EXISTS "Admins can insert subscription history" ON public.subscription_history;
+DROP POLICY IF EXISTS "Allow anon insert subscription history" ON public.subscription_history;
 
--- Allow anon access for subscription history queries
+-- Allow anon access for subscription history queries and inserts
 CREATE POLICY "Allow anon subscription history access" ON public.subscription_history
     FOR SELECT
     TO anon
     USING (true);
+
+CREATE POLICY "Allow anon insert subscription history" ON public.subscription_history
+    FOR INSERT
+    TO anon
+    WITH CHECK (true);
 
 -- Admins can see all subscription history
 CREATE POLICY "Admins can view all subscription history" ON public.subscription_history
