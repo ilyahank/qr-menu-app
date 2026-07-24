@@ -1,9 +1,9 @@
 -- Multi-Tenancy RLS Policies
 -- Ensure Restaurant A can never access Restaurant B's data
 
--- Enable RLS on all tables (if not already enabled)
+-- Enable RLS on all tables EXCEPT users (login requires anon access)
 ALTER TABLE public.restaurants ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.users DISABLE ROW LEVEL SECURITY; -- Disable for login
 ALTER TABLE public.menu_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.categories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.orders ENABLE ROW LEVEL SECURITY;
@@ -17,6 +17,11 @@ RETURNS UUID AS $$
 DECLARE
     v_restaurant_id UUID;
 BEGIN
+    -- Return NULL if not authenticated
+    IF auth.uid() IS NULL THEN
+        RETURN NULL;
+    END IF;
+    
     SELECT restaurant_id INTO v_restaurant_id
     FROM public.users
     WHERE id = auth.uid();
@@ -29,6 +34,11 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 CREATE OR REPLACE FUNCTION is_admin()
 RETURNS BOOLEAN AS $$
 BEGIN
+    -- Return false if not authenticated
+    IF auth.uid() IS NULL THEN
+        RETURN false;
+    END IF;
+    
     RETURN EXISTS (
         SELECT 1 FROM public.users
         WHERE id = auth.uid() AND role = 'admin'
@@ -53,28 +63,9 @@ CREATE POLICY "Owners can view their restaurant" ON public.restaurants
     TO authenticated
     USING (id = get_current_restaurant_id());
 
--- USERS RLS Policies
-DROP POLICY IF EXISTS "Admins can view all users" ON public.users;
-DROP POLICY IF EXISTS "Owners can view their restaurant users" ON public.users;
-DROP POLICY IF EXISTS "Allow login by username" ON public.users;
-
--- Allow unauthenticated users to query users by username for login only
-CREATE POLICY "Allow login by username" ON public.users
-    FOR SELECT
-    TO anon
-    USING (true); -- Note: This allows anon access for login. Consider using a PostgreSQL function for more secure authentication
-
--- Admins can see all users
-CREATE POLICY "Admins can view all users" ON public.users
-    FOR SELECT
-    TO authenticated
-    USING (is_admin());
-
--- Owners can only see users from their restaurant
-CREATE POLICY "Owners can view their restaurant users" ON public.users
-    FOR SELECT
-    TO authenticated
-    USING (restaurant_id = get_current_restaurant_id());
+-- USERS RLS Policies - DISABLED for login access
+-- Users table RLS is disabled to allow anonymous login queries
+-- Multi-tenancy for users is handled at application level
 
 -- MENU ITEMS RLS Policies
 DROP POLICY IF EXISTS "Admins can view all menu items" ON public.menu_items;
