@@ -140,6 +140,13 @@ CREATE POLICY "Owners can view their order items" ON public.order_items
 -- SUBSCRIPTIONS RLS Policies
 DROP POLICY IF EXISTS "Admins can view all subscriptions" ON public.subscriptions;
 DROP POLICY IF EXISTS "Owners can view their subscription" ON public.subscriptions;
+DROP POLICY IF EXISTS "Allow anon subscription access" ON public.subscriptions;
+
+-- Allow anon access for subscription queries (needed for some operations)
+CREATE POLICY "Allow anon subscription access" ON public.subscriptions
+    FOR SELECT
+    TO anon
+    USING (true);
 
 -- Admins can see all subscriptions
 CREATE POLICY "Admins can view all subscriptions" ON public.subscriptions
@@ -156,6 +163,13 @@ CREATE POLICY "Owners can view their subscription" ON public.subscriptions
 -- SUBSCRIPTION HISTORY RLS Policies
 DROP POLICY IF EXISTS "Admins can view all subscription history" ON public.subscription_history;
 DROP POLICY IF EXISTS "Owners can view their subscription history" ON public.subscription_history;
+DROP POLICY IF EXISTS "Allow anon subscription history access" ON public.subscription_history;
+
+-- Allow anon access for subscription history queries
+CREATE POLICY "Allow anon subscription history access" ON public.subscription_history
+    FOR SELECT
+    TO anon
+    USING (true);
 
 -- Admins can see all subscription history
 CREATE POLICY "Admins can view all subscription history" ON public.subscription_history
