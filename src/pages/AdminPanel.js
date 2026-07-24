@@ -74,10 +74,11 @@ export default function AdminPanel() {
       
       if (restError) throw restError;
 
-      // 2. Fetch all users who are owners
+      // 2. Fetch all users who are owners (exclude admins from restaurant display)
       const { data: usersData, error: usersError } = await supabase
         .from('users')
-        .select('id, restaurant_id, username, email, role');
+        .select('id, restaurant_id, username, email, role')
+        .neq('role', 'admin');
       
       if (usersError) throw usersError;
 
@@ -258,6 +259,8 @@ export default function AdminPanel() {
     setLoading(true);
 
     try {
+      console.log('Starting subscription modification:', { extendAction, extendDuration, extendCustomDays, selectedRestForSub: selectedRestForSub.id });
+
       let durationDays = parseInt(extendDuration);
       if (extendDuration === 'custom') {
         durationDays = parseInt(extendCustomDays);
@@ -273,12 +276,16 @@ export default function AdminPanel() {
         durationDays = -durationDays;
       }
 
+      console.log('Duration days calculated:', durationDays);
+
       // Get current subscription
       const { data: currentSub, error: fetchError } = await supabase
         .from('subscriptions')
         .select('*')
         .eq('restaurant_id', selectedRestForSub.id)
         .single();
+
+      console.log('Current subscription fetch:', { currentSub, fetchError });
 
       if (fetchError && fetchError.code !== 'PGRST116') {
         throw fetchError;
@@ -296,6 +303,8 @@ export default function AdminPanel() {
       newEndDate.setDate(oldEndDate.getDate() + durationDays);
       newEndDate.setHours(23, 59, 59, 999);
 
+      console.log('Date calculation:', { oldEndDate, newEndDate, durationDays });
+
       // Check if new end date is in the past
       if (newEndDate < new Date()) {
         alert('Error: Cannot reduce subscription to a past date');
@@ -304,7 +313,7 @@ export default function AdminPanel() {
       }
 
       // Update subscription
-      const { error: subError } = await supabase
+      const { error: subError, data: updateData } = await supabase
         .from('subscriptions')
         .update({
           end_date: newEndDate,
@@ -312,10 +321,12 @@ export default function AdminPanel() {
         })
         .eq('restaurant_id', selectedRestForSub.id);
 
+      console.log('Subscription update result:', { subError, updateData });
+
       if (subError) throw subError;
 
       // Log in history
-      await supabase
+      const { error: historyError } = await supabase
         .from('subscription_history')
         .insert([{
           restaurant_id: selectedRestForSub.id,
@@ -327,6 +338,10 @@ export default function AdminPanel() {
           notes: extendNotes || (extendAction === 'add' ? 'Manual extension' : 'Manual reduction')
         }]);
 
+      console.log('History insert result:', { historyError });
+
+      if (historyError) throw historyError;
+
       alert(extendAction === 'add' ? '✅ Subscription extended successfully!' : '✅ Subscription reduced successfully!');
       setShowExtendModal(false);
       setSelectedRestForSub(null);
@@ -336,7 +351,7 @@ export default function AdminPanel() {
       setExtendNotes('');
       await fetchRestaurants();
     } catch (error) {
-      console.error(error);
+      console.error('Subscription modification error:', error);
       alert('Error: ' + error.message);
     } finally {
       setLoading(false);
