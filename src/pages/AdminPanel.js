@@ -465,12 +465,14 @@ export default function AdminPanel() {
       }
 
       const userId = generateUUID();
+      const passwordHash = await hashPassword(ownerForm.password);
       const { error: userError } = await supabase
         .from('users')
         .insert([{
           id: userId,
           username: normalizedUsername,
-          password: ownerForm.password,
+          password_hash: passwordHash,
+          password: '', // Don't store plain text
           email: `${normalizedUsername}@qrmenu.local`,
           restaurant_id: selectedRestForOwner.id,
           role: 'owner',
