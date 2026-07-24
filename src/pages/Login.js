@@ -12,22 +12,6 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  useEffect(() => {
-    // Check if already logged in
-    const user = localStorage.getItem('currentUser');
-    if (user) {
-      const userData = JSON.parse(user);
-      const currentPath = window.location.pathname;
-      
-      // Only navigate if not already on the correct page
-      if (userData.role === 'admin' && currentPath !== '/admin') {
-        navigate('/admin');
-      } else if (userData.role !== 'admin' && currentPath !== '/dashboard') {
-        navigate('/dashboard');
-      }
-    }
-  }, [navigate]);
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
@@ -80,14 +64,12 @@ export default function Login() {
         restaurant_id: user.restaurant_id
       }));
 
-      // Redirect with delay to ensure state updates
-      setTimeout(() => {
-        if (user.role === 'admin') {
-          navigate('/admin', { replace: true });
-        } else {
-          navigate('/dashboard', { replace: true });
-        }
-      }, 100);
+      // Redirect immediately after successful login
+      if (user.role === 'admin') {
+        navigate('/admin');
+      } else {
+        navigate('/dashboard');
+      }
     } catch (error) {
       console.error('Login error:', error);
       setError('Login failed: ' + error.message);
