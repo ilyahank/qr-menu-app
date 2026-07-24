@@ -60,6 +60,7 @@ export default function Login() {
               onChange={(e) => setUsername(e.target.value)} 
               required 
               placeholder="Enter your username"
+              autoComplete="username"
             />
           </div>
           <div className="form-group">
@@ -70,6 +71,7 @@ export default function Login() {
               onChange={(e) => setPassword(e.target.value)} 
               required 
               placeholder="Enter your password"
+              autoComplete="current-password"
             />
           </div>
           <button type="submit" className="login-btn" disabled={loading}>

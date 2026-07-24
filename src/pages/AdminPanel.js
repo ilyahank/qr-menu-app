@@ -4,6 +4,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { supabase } from '../supabase';
 import { useNavigate, Link } from 'react-router-dom';
 import LangSwitcher from '../components/LangSwitcher';
+import { hashPassword } from '../utils/passwordUtils';
 import './AdminPanel.css';
 
 const generateUUID = () => {
@@ -180,12 +181,14 @@ export default function AdminPanel() {
 
       // Create owner user
       const userId = generateUUID();
+      const passwordHash = await hashPassword(formData.password);
       const { error: userError } = await supabase
         .from('users')
         .insert([{
           id: userId,
           username: normalizedUsername,
-          password: formData.password,
+          password_hash: passwordHash,
+          password: '', // Don't store plain text
           email: `${normalizedUsername}@qrmenu.local`,
           restaurant_id: restaurantData.id,
           role: 'owner',
