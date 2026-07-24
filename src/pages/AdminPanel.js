@@ -43,6 +43,7 @@ export default function AdminPanel() {
   // Subscription Extension Modal State
   const [showExtendModal, setShowExtendModal] = useState(false);
   const [selectedRestForSub, setSelectedRestForSub] = useState(null);
+  const [extendAction, setExtendAction] = useState('add'); // 'add' or 'reduce'
   const [extendDuration, setExtendDuration] = useState('14'); // 14, 30, 90, 365, custom
   const [extendCustomDays, setExtendCustomDays] = useState('');
   const [extendNotes, setExtendNotes] = useState('');
@@ -267,6 +268,11 @@ export default function AdminPanel() {
         }
       }
 
+      // If reducing, make the days negative
+      if (extendAction === 'reduce') {
+        durationDays = -durationDays;
+      }
+
       // Get current subscription
       const { data: currentSub, error: fetchError } = await supabase
         .from('subscriptions')
@@ -278,34 +284,33 @@ export default function AdminPanel() {
         throw fetchError;
       }
 
+      if (!currentSub) {
+        alert('Cannot reduce subscription - no active subscription found');
+        setLoading(false);
+        return;
+      }
+
       // Calculate new end date
-      const oldEndDate = currentSub ? new Date(currentSub.end_date) : new Date();
+      const oldEndDate = new Date(currentSub.end_date);
       const newEndDate = new Date(oldEndDate);
       newEndDate.setDate(oldEndDate.getDate() + durationDays);
       newEndDate.setHours(23, 59, 59, 999);
 
-      // Update or create subscription
-      let subError;
-      if (currentSub) {
-        const { error } = await supabase
-          .from('subscriptions')
-          .update({
-            end_date: newEndDate,
-            status: durationDays > 7 ? 'active' : 'expiring_soon'
-          })
-          .eq('restaurant_id', selectedRestForSub.id);
-        subError = error;
-      } else {
-        const { error } = await supabase
-          .from('subscriptions')
-          .insert([{
-            restaurant_id: selectedRestForSub.id,
-            start_date: new Date(),
-            end_date: newEndDate,
-            status: durationDays > 7 ? 'active' : 'expiring_soon'
-          }]);
-        subError = error;
+      // Check if new end date is in the past
+      if (newEndDate < new Date()) {
+        alert('Error: Cannot reduce subscription to a past date');
+        setLoading(false);
+        return;
       }
+
+      // Update subscription
+      const { error: subError } = await supabase
+        .from('subscriptions')
+        .update({
+          end_date: newEndDate,
+          status: (newEndDate - new Date()) > (7 * 24 * 60 * 60 * 1000) ? 'active' : 'expiring_soon'
+        })
+        .eq('restaurant_id', selectedRestForSub.id);
 
       if (subError) throw subError;
 
@@ -315,23 +320,24 @@ export default function AdminPanel() {
         .insert([{
           restaurant_id: selectedRestForSub.id,
           extended_by: currentUser?.id || null,
-          action_type: currentSub ? 'extend' : 'create',
-          old_end_date: currentSub?.end_date || null,
+          action_type: extendAction === 'add' ? 'extend' : 'reduce',
+          old_end_date: currentSub.end_date,
           new_end_date: newEndDate,
           duration_days: durationDays,
-          notes: extendNotes || 'Manual extension'
+          notes: extendNotes || (extendAction === 'add' ? 'Manual extension' : 'Manual reduction')
         }]);
 
-      alert('✅ Subscription extended successfully!');
+      alert(extendAction === 'add' ? '✅ Subscription extended successfully!' : '✅ Subscription reduced successfully!');
       setShowExtendModal(false);
       setSelectedRestForSub(null);
+      setExtendAction('add');
       setExtendDuration('14');
       setExtendCustomDays('');
       setExtendNotes('');
       await fetchRestaurants();
     } catch (error) {
       console.error(error);
-      alert('Error extending subscription: ' + error.message);
+      alert('Error: ' + error.message);
     } finally {
       setLoading(false);
     }
@@ -703,16 +709,42 @@ export default function AdminPanel() {
         {showExtendModal && selectedRestForSub && (
           <div className="modal">
             <div className="modal-content" style={{ textAlign: 'right' }}>
-              <h2>تمديد الاشتراك لـ: {selectedRestForSub.name}</h2>
+              <h2>{extendAction === 'add' ? 'تمديد' : 'تقليل'} الاشتراك لـ: {selectedRestForSub.name}</h2>
               <p style={{ color: '#555', fontSize: '14px', marginBottom: '20px' }}>
                 تاريخ انتهاء الاشتراك الحالي: <strong>{selectedRestForSub.subscription ? new Date(selectedRestForSub.subscription.end_date).toLocaleDateString('ar-DZ') : 'غير محدد'}</strong>
                 <br />
-                (ملاحظة: إذا كان الاشتراك غير منتهٍ، سيتم إضافة الأيام فوق تاريخ الانتهاء الحالي. وإذا كان منتهياً، فسيتم تمديده بدءاً من تاريخ اليوم).
+                (ملاحظة: إذا كان الاشتراك غير منتهٍ، سيتم {extendAction === 'add' ? 'إضافة' : 'تقليل'} الأيام {extendAction === 'add' ? 'فوق' : 'من'} تاريخ الانتهاء الحالي).
               </p>
               
               <form onSubmit={handleExtendSubscription}>
                 <div className="form-group">
-                  <label>فترة التمديد</label>
+                  <label>نوع العملية</label>
+                  <div style={{ display: 'flex', gap: '15px', marginBottom: '15px' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                      <input 
+                        type="radio" 
+                        name="extendAction" 
+                        value="add" 
+                        checked={extendAction === 'add'}
+                        onChange={(e) => setExtendAction(e.target.value)}
+                      />
+                      <span>إضافة أيام (+)</span>
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                      <input 
+                        type="radio" 
+                        name="extendAction" 
+                        value="reduce" 
+                        checked={extendAction === 'reduce'}
+                        onChange={(e) => setExtendAction(e.target.value)}
+                      />
+                      <span>تقليل أيام (-)</span>
+                    </label>
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label>{extendAction === 'add' ? 'فترة الإضافة' : 'فترة التقليل'}</label>
                   <select 
                     value={extendDuration} 
                     onChange={(e) => setExtendDuration(e.target.value)} 
@@ -729,7 +761,7 @@ export default function AdminPanel() {
 
                 {extendDuration === 'custom' && (
                   <div className="form-group">
-                    <label>عدد الأيام المطلوب إضافتها *</label>
+                    <label>عدد الأيام *</label>
                     <input 
                       type="number" 
                       value={extendCustomDays} 
@@ -752,8 +784,25 @@ export default function AdminPanel() {
                 </div>
 
                 <div className="form-actions" style={{ justifyContent: 'flex-start', gap: '12px' }}>
-                  <button type="submit" className="submit-btn" disabled={loading}>{loading ? 'جاري التمديد...' : 'تأكيد التمديد'}</button>
-                  <button type="button" onClick={() => { setShowExtendModal(false); setSelectedRestForSub(null); }} className="cancel-btn">إلغاء</button>
+                  <button 
+                    type="submit" 
+                    className="submit-btn" 
+                    disabled={loading}
+                    style={{ backgroundColor: extendAction === 'reduce' ? '#dc3545' : '#4f46e5' }}
+                  >
+                    {loading ? 'جاري المعالجة...' : extendAction === 'add' ? 'تأكيد الإضافة' : 'تأكيد التقليل'}
+                  </button>
+                  <button 
+                    type="button" 
+                    onClick={() => { 
+                      setShowExtendModal(false); 
+                      setSelectedRestForSub(null); 
+                      setExtendAction('add');
+                    }} 
+                    className="cancel-btn"
+                  >
+                    إلغاء
+                  </button>
                 </div>
               </form>
             </div>
@@ -782,8 +831,16 @@ export default function AdminPanel() {
                     {historyList.length > 0 ? (
                       historyList.map(h => (
                         <tr key={h.id}>
-                          <td>{h.action_type === 'create' ? 'إنشاء وتفعيل' : 'تمديد يدوي'}</td>
-                          <td><strong>+{h.duration_days} يوم</strong></td>
+                          <td>
+                            {h.action_type === 'create' ? 'إنشاء وتفعيل' : 
+                             h.action_type === 'extend' ? 'تمديد يدوي' : 
+                             h.action_type === 'reduce' ? 'تقليل يدوي' : h.action_type}
+                          </td>
+                          <td>
+                            <strong style={{ color: h.action_type === 'reduce' ? '#dc3545' : '#28a745' }}>
+                              {h.duration_days > 0 ? '+' : ''}{h.duration_days} يوم
+                            </strong>
+                          </td>
                           <td>{new Date(h.new_end_date).toLocaleDateString('ar-DZ')}</td>
                           <td>{h.users?.username || 'النظام'}</td>
                           <td>{h.notes || '-'}</td>
