@@ -37,6 +37,10 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- RESTAURANTS RLS Policies
+-- Drop existing policies first
+DROP POLICY IF EXISTS "Admins can view all restaurants" ON public.restaurants;
+DROP POLICY IF EXISTS "Owners can view their restaurant" ON public.restaurants;
+
 -- Admins can see all restaurants
 CREATE POLICY "Admins can view all restaurants" ON public.restaurants
     FOR SELECT
@@ -50,6 +54,9 @@ CREATE POLICY "Owners can view their restaurant" ON public.restaurants
     USING (id = get_current_restaurant_id());
 
 -- USERS RLS Policies
+DROP POLICY IF EXISTS "Admins can view all users" ON public.users;
+DROP POLICY IF EXISTS "Owners can view their restaurant users" ON public.users;
+
 -- Admins can see all users
 CREATE POLICY "Admins can view all users" ON public.users
     FOR SELECT
@@ -63,6 +70,9 @@ CREATE POLICY "Owners can view their restaurant users" ON public.users
     USING (restaurant_id = get_current_restaurant_id());
 
 -- MENU ITEMS RLS Policies
+DROP POLICY IF EXISTS "Admins can view all menu items" ON public.menu_items;
+DROP POLICY IF EXISTS "Owners can view their menu items" ON public.menu_items;
+
 -- Admins can see all menu items
 CREATE POLICY "Admins can view all menu items" ON public.menu_items
     FOR SELECT
@@ -76,6 +86,9 @@ CREATE POLICY "Owners can view their menu items" ON public.menu_items
     USING (restaurant_id = get_current_restaurant_id());
 
 -- CATEGORIES RLS Policies
+DROP POLICY IF EXISTS "Admins can view all categories" ON public.categories;
+DROP POLICY IF EXISTS "Owners can view their categories" ON public.categories;
+
 -- Admins can see all categories
 CREATE POLICY "Admins can view all categories" ON public.categories
     FOR SELECT
@@ -89,6 +102,9 @@ CREATE POLICY "Owners can view their categories" ON public.categories
     USING (restaurant_id = get_current_restaurant_id());
 
 -- ORDERS RLS Policies
+DROP POLICY IF EXISTS "Admins can view all orders" ON public.orders;
+DROP POLICY IF EXISTS "Owners can view their orders" ON public.orders;
+
 -- Admins can see all orders
 CREATE POLICY "Admins can view all orders" ON public.orders
     FOR SELECT
@@ -102,6 +118,9 @@ CREATE POLICY "Owners can view their orders" ON public.orders
     USING (restaurant_id = get_current_restaurant_id());
 
 -- ORDER ITEMS RLS Policies
+DROP POLICY IF EXISTS "Admins can view all order items" ON public.order_items;
+DROP POLICY IF EXISTS "Owners can view their order items" ON public.order_items;
+
 -- Admins can see all order items
 CREATE POLICY "Admins can view all order items" ON public.order_items
     FOR SELECT
@@ -121,6 +140,9 @@ CREATE POLICY "Owners can view their order items" ON public.order_items
     );
 
 -- SUBSCRIPTIONS RLS Policies
+DROP POLICY IF EXISTS "Admins can view all subscriptions" ON public.subscriptions;
+DROP POLICY IF EXISTS "Owners can view their subscription" ON public.subscriptions;
+
 -- Admins can see all subscriptions
 CREATE POLICY "Admins can view all subscriptions" ON public.subscriptions
     FOR SELECT
@@ -134,6 +156,9 @@ CREATE POLICY "Owners can view their subscription" ON public.subscriptions
     USING (restaurant_id = get_current_restaurant_id());
 
 -- SUBSCRIPTION HISTORY RLS Policies
+DROP POLICY IF EXISTS "Admins can view all subscription history" ON public.subscription_history;
+DROP POLICY IF EXISTS "Owners can view their subscription history" ON public.subscription_history;
+
 -- Admins can see all subscription history
 CREATE POLICY "Admins can view all subscription history" ON public.subscription_history
     FOR SELECT
