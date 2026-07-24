@@ -1,81 +1,163 @@
-// Error Logging System
-// Logs all errors to both console and Supabase for tracking
+// System Logging Utility v2
+// Logs errors, warnings, info, security events to system_logs table
+// Uses JSONB directly (no stringification)
 
 import { supabase } from '../supabase';
 
-export const logError = async (error, context = {}) => {
-  const errorData = {
-    error_message: error.message || String(error),
-    error_stack: error.stack || null,
-    context: JSON.stringify(context),
-    user_id: localStorage.getItem('currentUser') ? JSON.parse(localStorage.getItem('currentUser')).id : null,
+const getCurrentUser = () => {
+  try {
+    const stored = localStorage.getItem('currentUser');
+    return stored ? JSON.parse(stored) : null;
+  } catch {
+    return null;
+  }
+};
+
+export const logError = async (error, context = {}, severity = 'medium') => {
+  const user = getCurrentUser();
+  const logData = {
+    log_type: 'error',
+    message: error.message || String(error),
+    context: context, // JSONB directly, no stringification
+    user_id: user?.id || null,
+    restaurant_id: user?.restaurant_id || null,
     url: window.location.href,
-    timestamp: new Date().toISOString(),
-    user_agent: navigator.userAgent
+    user_agent: navigator.userAgent,
+    severity: severity
   };
 
   // Log to console
-  console.error('Error logged:', errorData);
+  console.error('Error logged:', logData);
 
-  // Log to Supabase error_logs table
+  // Log to Supabase system_logs table
   try {
-    await supabase
-      .from('error_logs')
-      .insert([errorData]);
+    await supabase.from('system_logs').insert([logData]);
   } catch (logError) {
     console.error('Failed to log error to database:', logError);
   }
 };
 
+export const logWarning = async (message, context = {}) => {
+  const user = getCurrentUser();
+  const logData = {
+    log_type: 'warning',
+    message: message,
+    context: context,
+    user_id: user?.id || null,
+    restaurant_id: user?.restaurant_id || null,
+    url: window.location.href,
+    severity: 'low'
+  };
+
+  console.warn('Warning logged:', logData);
+
+  try {
+    await supabase.from('system_logs').insert([logData]);
+  } catch (logError) {
+    console.error('Failed to log warning to database:', logError);
+  }
+};
+
 export const logInfo = async (message, context = {}) => {
+  const user = getCurrentUser();
   const logData = {
     log_type: 'info',
     message: message,
-    context: JSON.stringify(context),
-    user_id: localStorage.getItem('currentUser') ? JSON.parse(localStorage.getItem('currentUser')).id : null,
+    context: context,
+    user_id: user?.id || null,
+    restaurant_id: user?.restaurant_id || null,
     url: window.location.href,
-    timestamp: new Date().toISOString()
+    severity: 'low'
   };
 
   console.log('Info logged:', logData);
 
   try {
-    await supabase
-      .from('error_logs')
-      .insert([logData]);
+    await supabase.from('system_logs').insert([logData]);
   } catch (logError) {
     console.error('Failed to log info to database:', logError);
   }
 };
 
-// React Error Boundary wrapper
-export class ErrorBoundary extends React.Component {
-  constructor(props) {
-    super(props);
-    this.state = { hasError: false, error: null };
-  }
+export const logSecurity = async (message, context = {}) => {
+  const user = getCurrentUser();
+  const logData = {
+    log_type: 'security',
+    message: message,
+    context: context,
+    user_id: user?.id || null,
+    restaurant_id: user?.restaurant_id || null,
+    url: window.location.href,
+    user_agent: navigator.userAgent,
+    severity: 'high'
+  };
 
-  static getDerivedStateFromError(error) {
-    return { hasError: true, error };
-  }
+  console.warn('Security event logged:', logData);
 
-  componentDidCatch(error, errorInfo) {
-    logError(error, {
-      componentStack: errorInfo.componentStack,
-      errorBoundary: true
-    });
+  try {
+    await supabase.from('system_logs').insert([logData]);
+  } catch (logError) {
+    console.error('Failed to log security event to database:', logError);
   }
+};
 
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div style={{ padding: '50px', textAlign: 'center' }}>
-          <h1>Something went wrong</h1>
-          <p>The error has been logged. Please try refreshing the page.</p>
-          <button onClick={() => window.location.reload()}>Refresh Page</button>
-        </div>
-      );
-    }
-    return this.props.children;
+export const logPayment = async (message, context = {}) => {
+  const user = getCurrentUser();
+  const logData = {
+    log_type: 'payment',
+    message: message,
+    context: context,
+    user_id: user?.id || null,
+    restaurant_id: user?.restaurant_id || null,
+    url: window.location.href,
+    severity: 'high'
+  };
+
+  console.log('Payment logged:', logData);
+
+  try {
+    await supabase.from('system_logs').insert([logData]);
+  } catch (logError) {
+    console.error('Failed to log payment to database:', logError);
   }
-}
+};
+
+export const logOrder = async (message, context = {}) => {
+  const user = getCurrentUser();
+  const logData = {
+    log_type: 'order',
+    message: message,
+    context: context,
+    user_id: user?.id || null,
+    restaurant_id: user?.restaurant_id || null,
+    url: window.location.href,
+    severity: 'medium'
+  };
+
+  console.log('Order logged:', logData);
+
+  try {
+    await supabase.from('system_logs').insert([logData]);
+  } catch (logError) {
+    console.error('Failed to log order to database:', logError);
+  }
+};
+
+export const logLogin = async (username, success = true) => {
+  const logData = {
+    log_type: 'login',
+    message: success ? `User login successful: ${username}` : `Failed login attempt: ${username}`,
+    context: { username, success },
+    url: window.location.href,
+    user_agent: navigator.userAgent,
+    severity: success ? 'low' : 'medium'
+  };
+
+  console.log('Login logged:', logData);
+
+  try {
+    await supabase.from('system_logs').insert([logData]);
+  } catch (logError) {
+    console.error('Failed to log login to database:', logError);
+  }
+};
