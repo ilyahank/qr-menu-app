@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useNavigate } from 'react-router-dom';
+import { supabase } from '../supabase';
 import LangSwitcher from '../components/LangSwitcher';
 import restaurantBg from '../assets/restaurant-bg.jpg';
 import './Login.css';
@@ -11,7 +12,7 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { signIn, userRole } = useAuth();
+  const { userRole } = useAuth();
   useLanguage();
   const navigate = useNavigate();
 
@@ -28,18 +29,43 @@ export default function Login() {
     setLoading(true);
 
     try {
-      const user = await signIn(username, password);
-      console.log('Login successful for:', user.username);
-      
-      // Redirect based on role
-      if (user.role === 'admin') {
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('username', username)
+        .single();
+
+      if (userError || !userData) {
+        setError('Invalid username or password');
+        setLoading(false);
+        return;
+      }
+
+      // Simple password comparison (plain text for now)
+      if (userData.password !== password) {
+        setError('Invalid username or password');
+        setLoading(false);
+        return;
+      }
+
+      // Store user session
+      localStorage.setItem('currentUser', JSON.stringify({
+        id: userData.id,
+        username: userData.username,
+        email: userData.email,
+        role: userData.role,
+        restaurant_id: userData.restaurant_id
+      }));
+
+      // Redirect
+      if (userData.role === 'admin') {
         navigate('/admin');
       } else {
         navigate('/dashboard');
       }
     } catch (error) {
       console.error('Login error:', error);
-      setError(error.message || 'Login failed');
+      setError('Login failed. Please try again.');
     }
     setLoading(false);
   };
@@ -53,29 +79,27 @@ export default function Login() {
         {error && <div className="error-message">{error}</div>}
         <form onSubmit={handleSubmit}>
           <div className="form-group">
-            <label>* Username</label>
+            <label>USERNAME *</label>
             <input 
               type="text" 
               value={username} 
               onChange={(e) => setUsername(e.target.value)} 
               required 
               placeholder="Enter your username"
-              autoComplete="username"
             />
           </div>
           <div className="form-group">
-            <label>* Password</label>
+            <label>PASSWORD *</label>
             <input 
               type="password" 
               value={password} 
               onChange={(e) => setPassword(e.target.value)} 
               required 
               placeholder="Enter your password"
-              autoComplete="current-password"
             />
           </div>
           <button type="submit" className="login-btn" disabled={loading}>
-            {loading ? 'Logging In...' : 'Login'}
+            {loading ? 'LOGGING IN...' : 'LOGIN'}
           </button>
         </form>
 
