@@ -55,7 +55,7 @@ export default function Login() {
 
       console.log('Login successful!');
 
-      // Store user
+      // Store user and token
       localStorage.setItem('currentUser', JSON.stringify({
         id: user.id,
         username: user.username,
@@ -63,6 +63,8 @@ export default function Login() {
         role: user.role,
         restaurant_id: user.restaurant_id
       }));
+      localStorage.setItem('authToken', 'token_' + Date.now());
+      localStorage.setItem('lastActivity', Date.now().toString());
 
       // Redirect immediately after successful login
       if (user.role === 'admin') {
