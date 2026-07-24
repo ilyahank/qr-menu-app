@@ -80,16 +80,17 @@ export default function Login() {
         restaurant_id: user.restaurant_id
       }));
 
-      // Redirect
-      if (user.role === 'admin') {
-        navigate('/admin');
-      } else {
-        navigate('/dashboard');
-      }
+      // Redirect with delay to ensure state updates
+      setTimeout(() => {
+        if (user.role === 'admin') {
+          navigate('/admin', { replace: true });
+        } else {
+          navigate('/dashboard', { replace: true });
+        }
+      }, 100);
     } catch (error) {
       console.error('Login error:', error);
       setError('Login failed: ' + error.message);
-    } finally {
       setLoading(false);
     }
   };
