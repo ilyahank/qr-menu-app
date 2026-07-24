@@ -143,6 +143,7 @@ DROP POLICY IF EXISTS "Owners can view their subscription" ON public.subscriptio
 DROP POLICY IF EXISTS "Allow anon subscription access" ON public.subscriptions;
 DROP POLICY IF EXISTS "Admins can update subscriptions" ON public.subscriptions;
 DROP POLICY IF EXISTS "Allow anon update subscriptions" ON public.subscriptions;
+DROP POLICY IF EXISTS "Owners can update their subscription" ON public.subscriptions;
 
 -- Allow anon access for subscription queries and updates (needed for some operations)
 CREATE POLICY "Allow anon subscription access" ON public.subscriptions
@@ -175,12 +176,20 @@ CREATE POLICY "Owners can view their subscription" ON public.subscriptions
     TO authenticated
     USING (restaurant_id = get_current_restaurant_id());
 
+-- Owners can update their restaurant's subscription
+CREATE POLICY "Owners can update their subscription" ON public.subscriptions
+    FOR ALL
+    TO authenticated
+    USING (restaurant_id = get_current_restaurant_id())
+    WITH CHECK (restaurant_id = get_current_restaurant_id());
+
 -- SUBSCRIPTION HISTORY RLS Policies
 DROP POLICY IF EXISTS "Admins can view all subscription history" ON public.subscription_history;
 DROP POLICY IF EXISTS "Owners can view their subscription history" ON public.subscription_history;
 DROP POLICY IF EXISTS "Allow anon subscription history access" ON public.subscription_history;
 DROP POLICY IF EXISTS "Admins can insert subscription history" ON public.subscription_history;
 DROP POLICY IF EXISTS "Allow anon insert subscription history" ON public.subscription_history;
+DROP POLICY IF EXISTS "Owners can insert their subscription history" ON public.subscription_history;
 
 -- Allow anon access for subscription history queries and inserts
 CREATE POLICY "Allow anon subscription history access" ON public.subscription_history
@@ -210,6 +219,12 @@ CREATE POLICY "Owners can view their subscription history" ON public.subscriptio
     FOR SELECT
     TO authenticated
     USING (restaurant_id = get_current_restaurant_id());
+
+-- Owners can insert subscription history for their restaurant
+CREATE POLICY "Owners can insert their subscription history" ON public.subscription_history
+    FOR INSERT
+    TO authenticated
+    WITH CHECK (restaurant_id = get_current_restaurant_id());
 
 -- Grant execute permissions on helper functions
 GRANT EXECUTE ON FUNCTION get_current_restaurant_id() TO authenticated;
