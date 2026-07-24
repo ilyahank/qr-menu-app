@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabase';
 import LangSwitcher from '../components/LangSwitcher';
 import restaurantBg from '../assets/restaurant-bg.jpg';
@@ -10,7 +9,6 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -66,12 +64,9 @@ export default function Login() {
       localStorage.setItem('authToken', 'token_' + Date.now());
       localStorage.setItem('lastActivity', Date.now().toString());
 
-      // Redirect immediately after successful login
-      if (user.role === 'admin') {
-        navigate('/admin');
-      } else {
-        navigate('/dashboard');
-      }
+      // Force full page reload to re-initialize AuthContext
+      const redirectPath = user.role === 'admin' ? '/admin' : '/dashboard';
+      window.location.href = redirectPath;
     } catch (error) {
       console.error('Login error:', error);
       setError('Login failed: ' + error.message);
