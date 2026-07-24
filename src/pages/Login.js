@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { supabase } from '../supabase';
+import { verifyPassword } from '../utils/passwordUtils';
 import LangSwitcher from '../components/LangSwitcher';
 import restaurantBg from '../assets/restaurant-bg.jpg';
 import './Login.css';
@@ -43,8 +44,17 @@ export default function Login() {
       const user = data[0];
       console.log('User found:', user.username);
 
-      // Check password
-      if (user.password !== password) {
+      // Check password - handle both hashed and plain text
+      let passwordMatch = false;
+      if (user.password_hash && user.password_hash !== '') {
+        // Use bcrypt verification for hashed passwords
+        passwordMatch = await verifyPassword(password, user.password_hash);
+      } else if (user.password && user.password !== '') {
+        // Use plain text comparison for backward compatibility
+        passwordMatch = user.password === password;
+      }
+
+      if (!passwordMatch) {
         console.log('Password mismatch');
         setError('Invalid username or password');
         setLoading(false);
