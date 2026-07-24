@@ -1,10 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '../contexts/AuthContext';
-import { useLanguage } from '../contexts/LanguageContext';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabase';
 import LangSwitcher from '../components/LangSwitcher';
-import restaurantBg from '../assets/restaurant-bg.jpg';
 import './Login.css';
 
 export default function Login() {
@@ -12,16 +9,20 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { userRole } = useAuth();
-  useLanguage();
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (userRole) {
-      if (userRole === 'admin') navigate('/admin');
-      else navigate('/dashboard');
+    // Check if already logged in
+    const user = localStorage.getItem('currentUser');
+    if (user) {
+      const userData = JSON.parse(user);
+      if (userData.role === 'admin') {
+        navigate('/admin');
+      } else {
+        navigate('/dashboard');
+      }
     }
-  }, [userRole, navigate]);
+  }, [navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -29,54 +30,75 @@ export default function Login() {
     setLoading(true);
 
     try {
-      const { data: userData, error: userError } = await supabase
+      console.log('Attempting login with username:', username);
+
+      // Query database
+      const { data, error: queryError } = await supabase
         .from('users')
         .select('*')
-        .eq('username', username)
-        .single();
+        .eq('username', username);
 
-      if (userError || !userData) {
+      console.log('Query result:', data, queryError);
+
+      if (queryError) {
+        console.error('Query error:', queryError);
+        setError('Database error. Try again.');
+        setLoading(false);
+        return;
+      }
+
+      if (!data || data.length === 0) {
+        console.log('User not found');
         setError('Invalid username or password');
         setLoading(false);
         return;
       }
 
-      // Simple password comparison (plain text for now)
-      if (userData.password !== password) {
+      const user = data[0];
+      console.log('User found:', user.username);
+
+      // Check password
+      if (user.password !== password) {
+        console.log('Password mismatch');
         setError('Invalid username or password');
         setLoading(false);
         return;
       }
 
-      // Store user session
+      console.log('Login successful!');
+
+      // Store user
       localStorage.setItem('currentUser', JSON.stringify({
-        id: userData.id,
-        username: userData.username,
-        email: userData.email,
-        role: userData.role,
-        restaurant_id: userData.restaurant_id
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+        restaurant_id: user.restaurant_id
       }));
 
       // Redirect
-      if (userData.role === 'admin') {
+      if (user.role === 'admin') {
         navigate('/admin');
       } else {
         navigate('/dashboard');
       }
     } catch (error) {
       console.error('Login error:', error);
-      setError('Login failed. Please try again.');
+      setError('Login failed: ' + error.message);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   return (
-    <div className="login-container" style={{ backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.6)), url(${restaurantBg})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundAttachment: 'fixed' }}>
+    <div className="login-container">
       <div className="login-card">
         <div className="login-lang"><LangSwitcher /></div>
         <h1>IRM</h1>
         <h2>Restaurant Login</h2>
+        
         {error && <div className="error-message">{error}</div>}
+        
         <form onSubmit={handleSubmit}>
           <div className="form-group">
             <label>USERNAME *</label>
@@ -88,6 +110,7 @@ export default function Login() {
               placeholder="Enter your username"
             />
           </div>
+          
           <div className="form-group">
             <label>PASSWORD *</label>
             <input 
@@ -98,6 +121,7 @@ export default function Login() {
               placeholder="Enter your password"
             />
           </div>
+          
           <button type="submit" className="login-btn" disabled={loading}>
             {loading ? 'LOGGING IN...' : 'LOGIN'}
           </button>
