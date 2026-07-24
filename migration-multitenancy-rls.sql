@@ -141,6 +141,7 @@ CREATE POLICY "Owners can view their order items" ON public.order_items
 DROP POLICY IF EXISTS "Admins can view all subscriptions" ON public.subscriptions;
 DROP POLICY IF EXISTS "Owners can view their subscription" ON public.subscriptions;
 DROP POLICY IF EXISTS "Allow anon subscription access" ON public.subscriptions;
+DROP POLICY IF EXISTS "Admins can update subscriptions" ON public.subscriptions;
 
 -- Allow anon access for subscription queries (needed for some operations)
 CREATE POLICY "Allow anon subscription access" ON public.subscriptions
@@ -154,6 +155,13 @@ CREATE POLICY "Admins can view all subscriptions" ON public.subscriptions
     TO authenticated
     USING (is_admin());
 
+-- Admins can update subscriptions
+CREATE POLICY "Admins can update subscriptions" ON public.subscriptions
+    FOR ALL
+    TO authenticated
+    USING (is_admin())
+    WITH CHECK (is_admin());
+
 -- Owners can only see their restaurant's subscription
 CREATE POLICY "Owners can view their subscription" ON public.subscriptions
     FOR SELECT
@@ -164,6 +172,7 @@ CREATE POLICY "Owners can view their subscription" ON public.subscriptions
 DROP POLICY IF EXISTS "Admins can view all subscription history" ON public.subscription_history;
 DROP POLICY IF EXISTS "Owners can view their subscription history" ON public.subscription_history;
 DROP POLICY IF EXISTS "Allow anon subscription history access" ON public.subscription_history;
+DROP POLICY IF EXISTS "Admins can insert subscription history" ON public.subscription_history;
 
 -- Allow anon access for subscription history queries
 CREATE POLICY "Allow anon subscription history access" ON public.subscription_history
@@ -176,6 +185,12 @@ CREATE POLICY "Admins can view all subscription history" ON public.subscription_
     FOR SELECT
     TO authenticated
     USING (is_admin());
+
+-- Admins can insert subscription history
+CREATE POLICY "Admins can insert subscription history" ON public.subscription_history
+    FOR INSERT
+    TO authenticated
+    WITH CHECK (is_admin());
 
 -- Owners can only see their restaurant's subscription history
 CREATE POLICY "Owners can view their subscription history" ON public.subscription_history
