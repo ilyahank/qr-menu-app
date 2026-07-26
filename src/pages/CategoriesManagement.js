@@ -38,16 +38,31 @@ export default function CategoriesManagement() {
     e.preventDefault();
     setLoading(true);
     try {
+      console.log('Submitting category:', { categoryName, categoryIcon, restaurantId });
       const categoryData = { name: categoryName, icon: categoryIcon, restaurant_id: restaurantId };
       if (editingCategory) {
-        await supabase.from('categories').update(categoryData).eq('id', editingCategory.id);
+        console.log('Updating category:', editingCategory.id);
+        const { error: updateError } = await supabase.from('categories').update(categoryData).eq('id', editingCategory.id);
+        if (updateError) {
+          console.error('Update error:', updateError);
+          throw updateError;
+        }
       } else {
-        await supabase.from('categories').insert([categoryData]);
+        console.log('Inserting new category:', categoryData);
+        const { error: insertError } = await supabase.from('categories').insert([categoryData]);
+        if (insertError) {
+          console.error('Insert error:', insertError);
+          throw insertError;
+        }
       }
       const { data } = await supabase.from('categories').select('*').eq('restaurant_id', restaurantId).order('name');
       setCategories(data || []);
       setShowForm(false); setEditingCategory(null); setCategoryName(''); setCategoryIcon('🍽️');
-    } catch (error) { alert('Error: ' + error.message); }
+      console.log('Category saved successfully');
+    } catch (error) { 
+      console.error('Category submission error:', error);
+      alert('Error: ' + error.message); 
+    }
     setLoading(false);
   };
 
