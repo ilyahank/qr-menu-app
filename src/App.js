@@ -1,4 +1,6 @@
 import React from 'react';
+import LocalPublicMenu from './pages/LocalPublicMenu';
+
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { LanguageProvider } from './contexts/LanguageContext';
@@ -41,6 +43,8 @@ function App() {
             <Route path="/dashboard/orders" element={<PrivateRoute><OrdersManagement /></PrivateRoute>} />
             <Route path="/dashboard/analytics" element={<PrivateRoute><Analytics /></PrivateRoute>} />
             <Route path="/dashboard/tables" element={<PrivateRoute><TablesManagement /></PrivateRoute>} />
+
+           <Route path="/local-menu" element={<LocalPublicMenu />} />
             
             {/* Admin Routes */}
             <Route path="/admin" element={<AdminRoute><AdminPanel /></AdminRoute>} />

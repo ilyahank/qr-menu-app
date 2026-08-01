@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabase';
+import * as localApi from '../localApi';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import QRCode from 'qrcode.react';
@@ -18,6 +19,7 @@ export default function TablesManagement() {
   const [newTableNumber, setNewTableNumber] = useState('');
   const [newTableName, setNewTableName] = useState('');
   const [isAdding, setIsAdding] = useState(false);
+  const [localIp, setLocalIp] = useState(null);
 
   const isRtl = t?.dir === 'rtl';
 
@@ -25,6 +27,7 @@ export default function TablesManagement() {
     const fetchData = async () => {
       if (!currentUser) return;
       try {
+        // Restaurant identity still comes from Supabase (online part)
         const { data: userData } = await supabase
           .from('users')
           .select('restaurant_id')
@@ -38,14 +41,15 @@ export default function TablesManagement() {
             .eq('id', userData.restaurant_id)
             .single();
           setRestaurant(restaurantData);
-
-          const { data: tablesData } = await supabase
-            .from('restaurant_tables')
-            .select('*')
-            .eq('restaurant_id', userData.restaurant_id)
-            .order('table_number');
-          setTables(tablesData || []);
         }
+
+        // Tables come from the LOCAL server (offline part)
+        const tablesData = await localApi.getTables();
+        setTables(tablesData || []);
+
+        // Local network IP, so table QR codes point to the LAN address
+        const netInfo = await localApi.getNetworkInfo();
+        setLocalIp(netInfo.ip);
       } catch (error) {
         console.error(error);
         setError(error.message);
@@ -57,8 +61,10 @@ export default function TablesManagement() {
   }, [currentUser]);
 
   const generateQRUrl = (tableNumber) => {
-    const baseUrl = window.location.origin;
-    return `${baseUrl}/r/${restaurant.id}?table=${tableNumber}`;
+    // Points to the LOCAL network address so customers on the restaurant WiFi
+    // can order even with no internet connection.
+    if (!localIp) return ''; // not ready yet
+    return `http://${localIp}:3000/local-menu?table=${tableNumber}`;
   };
 
   const handleAddTable = async (e) => {
@@ -67,22 +73,22 @@ export default function TablesManagement() {
 
     setIsAdding(true);
     try {
-      const { error } = await supabase
-        .from('restaurant_tables')
-        .insert([{
-          restaurant_id: restaurant.id,
-          table_number: newTableNumber.trim(),
-          table_name: newTableName.trim() || null
-        }]);
+      // Duplicate check against local tables already in state
+      const exists = tables.some(
+        (tb) => String(tb.table_number) === newTableNumber.trim()
+      );
+      if (exists) {
+        alert(isRtl
+          ? 'رقم الطاولة موجود بالفعل. يرجى استخدام رقم مختلف.'
+          : 'Table number already exists. Please use a different number.');
+        setIsAdding(false);
+        return;
+      }
 
-      if (error) throw error;
+      await localApi.createTable(newTableNumber.trim());
 
-      // Refresh tables list
-      const { data: tablesData } = await supabase
-        .from('restaurant_tables')
-        .select('*')
-        .eq('restaurant_id', restaurant.id)
-        .order('table_number');
+      // Refresh tables list from local server
+      const tablesData = await localApi.getTables();
       setTables(tablesData || []);
 
       setNewTableNumber('');
@@ -90,15 +96,7 @@ export default function TablesManagement() {
       setShowAddModal(false);
     } catch (error) {
       console.error(error);
-      let errorMessage = error.message || (isRtl ? 'فشل إضافة الطاولة' : 'Failed to add table');
-      
-      // Provide user-friendly message for duplicate table number
-      if (error.code === '23505' || errorMessage.includes('duplicate key') || errorMessage.includes('unique constraint')) {
-        errorMessage = isRtl 
-          ? 'رقم الطاولة موجود بالفعل. يرجى استخدام رقم مختلف.' 
-          : 'Table number already exists. Please use a different number.';
-      }
-      
+      const errorMessage = error.message || (isRtl ? 'فشل إضافة الطاولة' : 'Failed to add table');
       alert(errorMessage);
     } finally {
       setIsAdding(false);
@@ -109,13 +107,7 @@ export default function TablesManagement() {
     if (!window.confirm(isRtl ? 'هل أنت متأكد من حذف هذه الطاولة؟' : 'Are you sure you want to delete this table?')) return;
 
     try {
-      const { error } = await supabase
-        .from('restaurant_tables')
-        .delete()
-        .eq('id', tableId);
-
-      if (error) throw error;
-
+      await localApi.deleteTable(tableId);
       setTables(tables.filter(t => t.id !== tableId));
     } catch (error) {
       console.error(error);
@@ -189,16 +181,25 @@ export default function TablesManagement() {
                 </div>
                 <div className="qr-section">
                   <div className="qr-container">
-                    <QRCode
-                      id={`qr-${table.id}`}
-                      value={generateQRUrl(table.table_number)}
-                      size={150}
-                      level="H"
-                    />
+                    {localIp ? (
+                      <QRCode
+                        id={`qr-${table.id}`}
+                        value={generateQRUrl(table.table_number)}
+                        size={150}
+                        level="H"
+                      />
+                    ) : (
+                      <p style={{ fontSize: '12px', color: '#999' }}>
+                        {isRtl
+                          ? '⚠️ تعذر اكتشاف عنوان الشبكة المحلية. تأكد أن السيرفر المحلي شغال.'
+                          : '⚠️ Could not detect local network address. Make sure the local server is running.'}
+                      </p>
+                    )}
                   </div>
                   <button
                     onClick={() => downloadQR(table.id, table.table_number)}
                     className="download-qr-btn"
+                    disabled={!localIp}
                   >
                     {isRtl ? 'تحميل QR' : 'Download QR'}
                   </button>

@@ -1,4 +1,8 @@
 import React, { useState, useEffect } from 'react';
+
+import { watchAndAutoSync } from '../syncService';
+
+
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { supabase } from '../supabase';
@@ -82,6 +86,15 @@ export default function Dashboard() {
     };
     fetchRestaurantData();
   }, [currentUser]);
+
+  // Sync menu + restaurant info to the local offline server whenever we
+  // have internet AND restaurantId is known. This runs in its own effect
+  // so it fires again once restaurantId becomes available.
+  useEffect(() => {
+    if (!restaurantId) return;
+    const cleanup = watchAndAutoSync(restaurantId);
+    return cleanup;
+  }, [restaurantId]);
 
   const checkArchivingStatus = async () => {
     if (!restaurantId) return;

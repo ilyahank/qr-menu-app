@@ -8,6 +8,11 @@ import LangSwitcher from '../components/LangSwitcher';
 import MobileDrawer from '../components/MobileDrawer';
 import './QRCodePage.css';
 
+// The delivery/takeaway menu is the ONLINE part of the app (Supabase-backed),
+// so its QR must always point to the production Vercel domain -- never to
+// window.location.origin, which would be "localhost" when testing locally.
+const PRODUCTION_URL = 'https://qr-menu-app-taupe.vercel.app';
+
 export default function QRCodePage() {
   const { currentUser, signOut, userRole } = useAuth();
   const { t } = useLanguage();
@@ -30,8 +35,8 @@ export default function QRCodePage() {
           setRestaurantId(userData.restaurant_id);
           const { data: restaurantData } = await supabase.from('restaurants').select('*').eq('id', userData.restaurant_id).single();
           setRestaurant(restaurantData);
-          setQrUrl(`${window.location.origin}/r/${restaurantData.id}`);
-          setTakeawayQrUrl(`${window.location.origin}/r/${restaurantData.id}?takeaway=true`);
+          setQrUrl(`${PRODUCTION_URL}/r/${restaurantData.id}`);
+          setTakeawayQrUrl(`${PRODUCTION_URL}/r/${restaurantData.id}?takeaway=true`);
           setDineInNote(restaurantData.dine_in_note || '');
           setDeliveryNote(restaurantData.delivery_note || '');
         }

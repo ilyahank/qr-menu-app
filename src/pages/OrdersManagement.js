@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { supabase } from '../supabase';
+import * as localApi from '../localApi';
 import { Link } from 'react-router-dom';
 import LangSwitcher from '../components/LangSwitcher';
 import MobileDrawer from '../components/MobileDrawer';
@@ -14,12 +15,12 @@ export default function OrdersManagement() {
   const [restaurant, setRestaurant] = useState(null);
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [restaurantId, setRestaurantId] = useState(null);
   const [statusFilter, setStatusFilter] = useState('all');
 
   // Print error message
   const [printErrorMsg, setPrintErrorMsg] = useState('');
 
+  // Restaurant identity still comes from Supabase (online part)
   useEffect(() => {
     const fetchOwnerRestaurant = async () => {
       if (!currentUser) return;
@@ -31,7 +32,6 @@ export default function OrdersManagement() {
           .single();
 
         if (userData?.restaurant_id) {
-          setRestaurantId(userData.restaurant_id);
           const { data: restaurantData } = await supabase
             .from('restaurants')
             .select('*')
@@ -46,28 +46,10 @@ export default function OrdersManagement() {
     fetchOwnerRestaurant();
   }, [currentUser]);
 
+  // Orders come from the LOCAL server (offline part)
   const fetchOrders = async () => {
-    if (!restaurantId) return;
     try {
-      // Fetch orders and join with order items and menu items
-      const { data, error } = await supabase
-        .from('orders')
-        .select(`
-          *,
-          order_items (
-            id,
-            quantity,
-            price,
-            notes,
-            menu_items (
-              name
-            )
-          )
-        `)
-        .eq('restaurant_id', restaurantId)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
+      const data = await localApi.getOrders();
       setOrders(data || []);
     } catch (error) {
       console.error('Error fetching orders:', error);
@@ -77,48 +59,21 @@ export default function OrdersManagement() {
   };
 
   useEffect(() => {
-    if (!restaurantId) return;
-    
     fetchOrders();
 
-    // Subscribe to Postgres Changes for realtime order updates
-    const channel = supabase
-      .channel('schema-db-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'orders',
-          filter: `restaurant_id=eq.${restaurantId}`
-        },
-        () => {
-          fetchOrders();
-        }
-      )
-      .subscribe();
-
-    // Fallback: Poll every 10 seconds in case realtime doesn't work
+    // No realtime on the local server — poll instead (fast on LAN)
     const pollingInterval = setInterval(() => {
       fetchOrders();
-    }, 10000);
+    }, 5000);
 
-    return () => {
-      supabase.removeChannel(channel);
-      clearInterval(pollingInterval);
-    };
+    return () => clearInterval(pollingInterval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [restaurantId]);
+  }, []);
 
   const updateOrderStatus = async (orderId, newStatus) => {
     try {
-      const { error } = await supabase
-        .from('orders')
-        .update({ status: newStatus, updated_at: new Date() })
-        .eq('id', orderId);
+      await localApi.updateOrderStatus(orderId, newStatus);
 
-      if (error) throw error;
-      
       // Update in-memory state
       const updatedOrders = orders.map(o => o.id === orderId ? { ...o, status: newStatus } : o);
       setOrders(updatedOrders);
@@ -128,10 +83,8 @@ export default function OrdersManagement() {
       if (order) {
         const orderWithNewStatus = { ...order, status: newStatus };
         if (newStatus === 'confirmed') {
-          // Print kitchen copy automatically when order is confirmed
           handlePrint(orderWithNewStatus, 'kitchen');
         } else if (newStatus === 'completed') {
-          // Print customer copy automatically when order is completed
           handlePrint(orderWithNewStatus, 'customer');
         }
       }
@@ -145,14 +98,7 @@ export default function OrdersManagement() {
     if (!window.confirm(t.dir === 'rtl' ? 'هل أنت متأكد من حذف هذا الطلب؟' : 'Are you sure you want to delete this order?')) return;
 
     try {
-      const { error } = await supabase
-        .from('orders')
-        .delete()
-        .eq('id', orderId);
-
-      if (error) throw error;
-      
-      // Remove from in-memory state
+      await localApi.deleteOrder(orderId);
       setOrders(orders.filter(o => o.id !== orderId));
     } catch (error) {
       setPrintErrorMsg(t.dir === 'rtl' ? 'فشل حذف الطلب: ' + error.message : 'Error deleting order: ' + error.message);
@@ -162,13 +108,8 @@ export default function OrdersManagement() {
 
   const unlockTable = async (tableNumber) => {
     try {
-      const { error } = await supabase.rpc('unlock_table', {
-        p_restaurant_id: restaurantId,
-        p_table_number: tableNumber
-      });
+      await localApi.unlockTable(tableNumber);
 
-      if (error) throw error;
-      
       setPrintErrorMsg(t.dir === 'rtl' ? 'تم فتح الطاولة بنجاح' : 'Table unlocked successfully');
       setTimeout(() => setPrintErrorMsg(''), 3000);
     } catch (error) {
@@ -181,12 +122,7 @@ export default function OrdersManagement() {
   const handlePrint = async (order, type) => {
     try {
       // 1. Check if print job already exists
-      const { data: existingJob } = await supabase
-        .from('print_jobs')
-        .select('*')
-        .eq('order_id', order.id)
-        .eq('print_type', type)
-        .maybeSingle();
+      const existingJob = await localApi.getPrintJob(order.id, type);
 
       if (existingJob && existingJob.status === 'printed') {
         const confirmReprint = window.confirm(
@@ -197,23 +133,8 @@ export default function OrdersManagement() {
         if (!confirmReprint) return;
       }
 
-      // 2. Insert or update print_jobs table for double-print protection
-      if (existingJob) {
-        await supabase
-          .from('print_jobs')
-          .update({ status: 'printed', attempts: existingJob.attempts + 1, updated_at: new Date() })
-          .eq('id', existingJob.id);
-      } else {
-        await supabase
-          .from('print_jobs')
-          .insert([{
-            restaurant_id: restaurantId,
-            order_id: order.id,
-            print_type: type,
-            status: 'printed',
-            attempts: 1
-          }]);
-      }
+      // 2. Mark as printed (double-print protection)
+      await localApi.markPrintJobPrinted(order.id, type);
 
       // 3. Generate receipt HTML
       const receiptHTML = generateReceiptHTML(order, type);
@@ -234,7 +155,7 @@ export default function OrdersManagement() {
   const generateReceiptHTML = (order, type) => {
     const isRtl = t?.dir === 'rtl';
     const date = new Date(order.created_at).toLocaleString('ar-DZ');
-    
+
     if (type === 'customer') {
       // Customer Receipt
       return `

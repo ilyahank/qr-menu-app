@@ -1,11 +1,28 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useSearchParams } from 'react-router-dom';
-import { supabase } from '../supabase';
+import { useSearchParams } from 'react-router-dom';
+import * as localApi from '../localApi';
 import './PublicMenu.css';
 import { useLanguage } from '../contexts/LanguageContext';
 
-export default function PublicMenu() {
-  const { restaurantId } = useParams();
+// generateUUID() only works in secure contexts (HTTPS or localhost).
+// Since customers open this over plain http://<local-ip>:3000, we need a
+// fallback UUID generator that works everywhere.
+function generateUUID() {
+  if (window.crypto && typeof window.crypto.randomUUID === 'function') {
+    return window.generateUUID();
+  }
+  // RFC4122-ish fallback using Math.random (good enough for a local session id)
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
+// Offline in-restaurant menu — served from the LOCAL server (localhost:3001).
+// No internet required: menu comes from the local cache, orders go straight
+// to the local SQLite database.
+export default function LocalPublicMenu() {
   const [searchParams] = useSearchParams();
   const [restaurant, setRestaurant] = useState(null);
   const [menuItems, setMenuItems] = useState([]);
@@ -14,7 +31,6 @@ export default function PublicMenu() {
   const [error, setError] = useState(null);
   const [activeCategory, setActiveCategory] = useState('all');
   const { t } = useLanguage();
-  const [isTakeaway, setIsTakeaway] = useState(false);
 
   // Cart State
   const [cart, setCart] = useState([]);
@@ -25,148 +41,65 @@ export default function PublicMenu() {
   const [orderSuccess, setOrderSuccess] = useState(false);
   const [submitError, setSubmitError] = useState('');
 
-  // Session State
+  // Session (device) id — persisted per browser, used for table locking
   const [sessionId, setSessionId] = useState('');
 
-  // Get table number and takeaway mode from URL query parameter on mount
+  // Get table number from URL (?table=5)
   useEffect(() => {
     const tableParam = searchParams.get('table');
-    const takeawayParam = searchParams.get('takeaway');
-    if (tableParam) {
-      setTableNumber(tableParam);
-    }
-    if (takeawayParam === 'true') {
-      setIsTakeaway(true);
-    }
+    if (tableParam) setTableNumber(tableParam);
   }, [searchParams]);
 
-  // Initialize session on mount
+  // Init local session id
   useEffect(() => {
-    const existingSession = localStorage.getItem(`session_${restaurantId}`);
-    if (existingSession) {
-      setSessionId(existingSession);
+    const existing = localStorage.getItem('local_session_id');
+    if (existing) {
+      setSessionId(existing);
     } else {
-      const newSession = crypto.randomUUID();
+      const newSession = generateUUID();
       setSessionId(newSession);
-      localStorage.setItem(`session_${restaurantId}`, newSession);
+      localStorage.setItem('local_session_id', newSession);
     }
-  }, [restaurantId]);
+  }, []);
 
-  // Check table lock when table number is entered
-  const checkTableLock = async (tableNum) => {
-    if (!tableNum || !sessionId) return false;
-
-    try {
-      const { data, error } = await supabase.rpc('is_table_locked', {
-        p_restaurant_id: restaurantId,
-        p_table_number: tableNum,
-        p_session_id: sessionId
-      });
-
-      if (error) throw error;
-      return data;
-    } catch (err) {
-      console.error('Error checking table lock:', err);
-      return false;
-    }
-  };
-
-  // Create/update session when table is selected
-  const createSession = async (tableNum) => {
-    if (!tableNum || !sessionId) return;
-
-    try {
-      const deviceInfo = navigator.userAgent;
-      const { error } = await supabase.rpc('create_or_update_table_session', {
-        p_restaurant_id: restaurantId,
-        p_table_number: tableNum,
-        p_session_id: sessionId,
-        p_device_info: deviceInfo
-      });
-
-      if (error) throw error;
-    } catch (err) {
-      console.error('Error creating session:', err);
-    }
-  };
-
+  // Load restaurant info + menu from the LOCAL server
   useEffect(() => {
-    const fetchMenuData = async () => {
+    const fetchLocalMenu = async () => {
       try {
         setLoading(true);
-        const { data: restaurantData, error: restaurantError } = await supabase
-          .from('restaurants').select('*').eq('id', restaurantId).single();
-        if (restaurantError) throw restaurantError;
-        if (!restaurantData.is_active) {
-          setError(t.restaurantClosed);
-          setLoading(false);
-          return;
-        }
 
-        // Check subscription
-        const { data: subData } = await supabase
-          .from('subscriptions')
-          .select('end_date')
-          .eq('restaurant_id', restaurantId)
-          .single();
+        const info = await localApi.getRestaurantInfo();
+        setRestaurant(info || { name: 'Restaurant', color: '#667eea' });
 
-        if (subData) {
-          const end = new Date(subData.end_date);
-          const today = new Date();
-          if (end <= today) {
-            setError(t.restaurantUnavailable);
-            setLoading(false);
-            return;
-          }
-        } else {
-          // If no subscription record exists, block by default
-          setError(t.restaurantUnavailable);
-          setLoading(false);
-          return;
-        }
+        const { categories: cats, items } = await localApi.getLocalMenu();
+        setCategories(cats || []);
+        setMenuItems(items || []);
 
-        setRestaurant(restaurantData);
-        
-        const { data: categoriesData } = await supabase
-          .from('categories').select('*').eq('restaurant_id', restaurantId).order('name');
-        setCategories(categoriesData || []);
-        
-        const { data: menuData } = await supabase
-          .from('menu_items').select('*').eq('restaurant_id', restaurantId).order('name');
-        setMenuItems(menuData || []);
-        
         setLoading(false);
       } catch (err) {
         console.error(err);
-        if (err.code === 'PGRST116' || err.message?.includes('invalid input syntax for type uuid')) {
-          setError(t.dir === 'rtl' ? 'المطعم غير موجود' : t.dir === 'fr' ? 'Restaurant non trouvé' : 'Restaurant not found');
-        } else {
-          setError(t.restaurantUnavailable);
-        }
+        setError(
+          t.dir === 'rtl'
+            ? 'تعذر الوصول للسيرفر المحلي. تأكد أنك متصل بنفس شبكة الواي فاي.'
+            : 'Could not reach the local server. Make sure you are on the restaurant WiFi.'
+        );
         setLoading(false);
       }
     };
-    if (restaurantId) fetchMenuData();
-  }, [restaurantId, t]);
+    fetchLocalMenu();
+  }, [t]);
 
-  // Load cart from localStorage on mount (scoped to restaurantId)
+  // Cart persistence (per browser)
   useEffect(() => {
-    if (restaurantId) {
-      const savedCart = localStorage.getItem(`cart_${restaurantId}`);
-      if (savedCart) {
-        try {
-          setCart(JSON.parse(savedCart));
-        } catch (e) {
-          console.error(e);
-        }
-      }
+    const savedCart = localStorage.getItem('local_cart');
+    if (savedCart) {
+      try { setCart(JSON.parse(savedCart)); } catch (e) { console.error(e); }
     }
-  }, [restaurantId]);
+  }, []);
 
-  // Save cart to localStorage
   const saveCart = (newCart) => {
     setCart(newCart);
-    localStorage.setItem(`cart_${restaurantId}`, JSON.stringify(newCart));
+    localStorage.setItem('local_cart', JSON.stringify(newCart));
   };
 
   const addToCart = (item) => {
@@ -189,13 +122,8 @@ export default function PublicMenu() {
     saveCart(updated);
   };
 
-  const getCartTotal = () => {
-    return cart.reduce((sum, item) => sum + (parseFloat(item.price) * item.quantity), 0);
-  };
-
-  const getCartCount = () => {
-    return cart.reduce((sum, item) => sum + item.quantity, 0);
-  };
+  const getCartTotal = () => cart.reduce((sum, item) => sum + (parseFloat(item.price) * item.quantity), 0);
+  const getCartCount = () => cart.reduce((sum, item) => sum + item.quantity, 0);
 
   const handleCheckout = async (e) => {
     e.preventDefault();
@@ -208,56 +136,32 @@ export default function PublicMenu() {
     setSubmitError('');
 
     try {
-      // Check if table is locked by another session
-      const isLocked = await checkTableLock(tableNumber.trim());
+      // Check if table is locked by another device
+      const isLocked = await localApi.checkTableLocked(tableNumber.trim(), sessionId);
       if (isLocked) {
-        setSubmitError(t.dir === 'rtl' ? 'هذه الطاولة مستخدمة حالياً. يرجى طلب المساعدة من النادل.' : 'This table is currently in use. Please ask staff for assistance.');
+        setSubmitError(
+          t.dir === 'rtl'
+            ? 'هذه الطاولة مستخدمة حالياً. يرجى طلب المساعدة من النادل.'
+            : 'This table is currently in use. Please ask staff for assistance.'
+        );
         setIsSubmitting(false);
         return;
       }
 
-      // Create/update session for this table
-      await createSession(tableNumber.trim());
+      await localApi.openTableSession(tableNumber.trim(), sessionId);
 
-      const totalPrice = getCartTotal();
+      await localApi.createOrder({
+        table_number: tableNumber.trim(),
+        session_id: sessionId,
+        notes: orderNotes.trim() || '',
+        items: cart.map(item => ({
+          item_id: item.id,
+          item_name: item.name,
+          price: parseFloat(item.price),
+          quantity: item.quantity,
+        })),
+      });
 
-      // 1. Insert order record
-      const { data: orderData, error: orderError } = await supabase
-        .from('orders')
-        .insert([{
-          restaurant_id: restaurantId,
-          table_number: tableNumber.trim(),
-          status: 'pending',
-          total_price: totalPrice,
-          notes: orderNotes.trim() || null
-        }])
-        .select()
-        .single();
-
-      if (orderError) {
-        // Handle trigger database block (subscription expired)
-        if (orderError.message.includes('subscription has expired') || orderError.message.includes('no active subscription')) {
-          throw new Error(t.subBannerExpired);
-        }
-        throw orderError;
-      }
-
-      // 2. Insert order items
-      const orderItemsToInsert = cart.map(item => ({
-        order_id: orderData.id,
-        menu_item_id: item.id,
-        quantity: item.quantity,
-        price: parseFloat(item.price),
-        notes: null
-      }));
-
-      const { error: itemsError } = await supabase
-        .from('order_items')
-        .insert(orderItemsToInsert);
-
-      if (itemsError) throw itemsError;
-
-      // 3. Clear cart
       saveCart([]);
       setTableNumber('');
       setOrderNotes('');
@@ -266,12 +170,25 @@ export default function PublicMenu() {
         setOrderSuccess(false);
         setShowCart(false);
       }, 4000);
-
     } catch (err) {
       console.error(err);
-      setSubmitError(err.message || 'فشلت عملية إرسال الطلب. يرجى المحاولة لاحقاً.');
+      setSubmitError(
+        err.message ||
+        (t.dir === 'rtl' ? 'فشلت عملية إرسال الطلب. يرجى المحاولة لاحقاً.' : 'Failed to submit order. Please try again.')
+      );
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const copyEmail = () => {
+    navigator.clipboard.writeText(restaurant.email_contact);
+    alert('Email copied: ' + restaurant.email_contact);
+  };
+
+  const callPhone = () => {
+    if (restaurant.phone) {
+      window.location.href = `tel:${restaurant.phone}`;
     }
   };
 
@@ -286,59 +203,21 @@ export default function PublicMenu() {
     return (
       <div className="public-menu error-page" style={{ direction: t.dir }}>
         <div className="error-card">
-          <div className="error-icon">🍽️</div>
-          <h2>{t.dir === 'rtl' ? 'المنيو غير متوفر' : t.dir === 'fr' ? 'Menu Non Disponible' : 'Menu Unavailable'}</h2>
+          <div className="error-icon">📡</div>
+          <h2>{t.dir === 'rtl' ? 'المنيو غير متوفر' : 'Menu Unavailable'}</h2>
           <p className="error-message">{error}</p>
-          <div className="error-divider"></div>
-          <p className="error-footer">
-            {t.dir === 'rtl' 
-              ? 'يرجى مراجعة إدارة المطعم لتجديد الاشتراك أو تفعيل المنيو.' 
-              : t.dir === 'fr' 
-              ? 'Veuillez contacter l\'administration du restaurant pour renouveler l\'abonnement.' 
-              : 'Please contact the restaurant administration to renew the subscription.'}
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!restaurant) {
-    return (
-      <div className="public-menu error-page" style={{ direction: t.dir }}>
-        <div className="error-card">
-          <div className="error-icon">🔍</div>
-          <h2>{t.dir === 'rtl' ? 'المطعم غير موجود' : t.dir === 'fr' ? 'Restaurant Non Trouvé' : 'Restaurant Not Found'}</h2>
-          <p className="error-message">
-            {t.dir === 'rtl' 
-              ? 'لم نتمكن من العثور على المطعم المطلوب. يرجى التأكد من الرابط.' 
-              : t.dir === 'fr' 
-              ? 'Nous n\'avons pas pu trouver le restaurant demandé. Veuillez vérifier le lien.' 
-              : 'We could not find the requested restaurant. Please verify the link.'}
-          </p>
         </div>
       </div>
     );
   }
 
   const isRtl = t.dir === 'rtl';
-
   const visibleCategories = categories.filter(cat =>
     menuItems.some(item => item.category_id === cat.id)
   );
   const filteredItems = activeCategory === 'all'
     ? menuItems
     : menuItems.filter(item => item.category_id === activeCategory);
-
-  const copyEmail = () => {
-    navigator.clipboard.writeText(restaurant.email_contact);
-    alert('Email copied: ' + restaurant.email_contact);
-  };
-
-  const callPhone = () => {
-    if (restaurant.phone) {
-      window.location.href = `tel:${restaurant.phone}`;
-    }
-  };
 
   return (
     <div className="public-menu" style={{ '--theme-color': restaurant.color || '#667eea', direction: t.dir, textAlign: isRtl ? 'right' : 'left' }}>
@@ -351,27 +230,7 @@ export default function PublicMenu() {
         </div>
         <h1 className="restaurant-name">{restaurant.name}</h1>
         {restaurant.tagline && <p className="restaurant-tagline">{restaurant.tagline}</p>}
-        {isTakeaway && restaurant.delivery_note && (
-          <div className="delivery-note-banner">
-            <p>{restaurant.delivery_note}</p>
-          </div>
-        )}
       </header>
-
-      {isTakeaway && restaurant.phone && (
-        <div className="phone-call-banner">
-          <div className="phone-call-content">
-            <div className="phone-icon">📞</div>
-            <div className="phone-info">
-              <h3>{isRtl ? 'اتصل للطلب' : 'Call to Order'}</h3>
-              <p className="phone-number">{restaurant.phone}</p>
-            </div>
-            <button onClick={callPhone} className="call-btn">
-              {isRtl ? 'اتصل الآن' : 'Call Now'}
-            </button>
-          </div>
-        </div>
-      )}
 
       {visibleCategories.length > 0 && (
         <div className="category-filters">
@@ -404,11 +263,9 @@ export default function PublicMenu() {
                         {item.description && <p className="item-description">{item.description}</p>}
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '10px' }}>
                           <span className="item-price">{parseFloat(item.price).toFixed(0)} {t.currency}</span>
-                          {!isTakeaway && (
-                            <button onClick={() => addToCart(item)} className="add-to-cart-btn">
-                              + {t.addToCart}
-                            </button>
-                          )}
+                          <button onClick={() => addToCart(item)} className="add-to-cart-btn">
+                            + {t.addToCart}
+                          </button>
                         </div>
                       </div>
                     </div>
@@ -420,8 +277,7 @@ export default function PublicMenu() {
         {filteredItems.length === 0 && <div className="empty-menu"><p>{t.noMenuItems}</p></div>}
       </div>
 
-      {/* FLOATING CART BAR - Only show for dine-in mode */}
-      {cart.length > 0 && !isTakeaway && (
+      {cart.length > 0 && (
         <div className="floating-cart-bar" onClick={() => setShowCart(true)}>
           <div className="cart-bar-content">
             <span className="cart-badge">{getCartCount()}</span>
@@ -431,7 +287,6 @@ export default function PublicMenu() {
         </div>
       )}
 
-      {/* CART DRAWER / MODAL */}
       {showCart && (
         <div className="cart-modal">
           <div className="cart-modal-overlay" onClick={() => !isSubmitting && setShowCart(false)}></div>
@@ -480,21 +335,21 @@ export default function PublicMenu() {
                 <div className="cart-inputs">
                   <div className="form-group">
                     <label>{t.tableNumber} *</label>
-                    <input 
-                      type="text" 
-                      value={tableNumber} 
-                      onChange={(e) => setTableNumber(e.target.value)} 
+                    <input
+                      type="text"
+                      value={tableNumber}
+                      onChange={(e) => setTableNumber(e.target.value)}
                       placeholder={t.tableNumberPlaceholder}
-                      required 
+                      required
                       disabled={isSubmitting}
                     />
                   </div>
 
                   <div className="form-group">
                     <label>{t.orderNotes}</label>
-                    <textarea 
-                      value={orderNotes} 
-                      onChange={(e) => setOrderNotes(e.target.value)} 
+                    <textarea
+                      value={orderNotes}
+                      onChange={(e) => setOrderNotes(e.target.value)}
                       placeholder={isRtl ? 'مثال: بدون بصل، فلفل حار جانبي...' : 'e.g., no onions, extra spicy...'}
                       rows="2"
                       disabled={isSubmitting}
